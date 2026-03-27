@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:tarek_proj/presentation/screens/services/provide_services3.dart';
+import 'package:tarek_proj/data/web_services/cloud_vision_service.dart';
 
 class ProvideServices2 extends StatefulWidget {
   final Map<String, dynamic> registrationData;
@@ -27,6 +28,8 @@ class _ProvideServices2State extends State<ProvideServices2> {
 
   // New Controllers and Variables
   final TextEditingController carLicenseController = TextEditingController();
+  final TextEditingController carLicenseEndDateController =
+      TextEditingController();
   final TextEditingController userLicenseController = TextEditingController();
   String? selectedCarModelYear;
   File? carLicenseImage;
@@ -77,8 +80,41 @@ class _ProvideServices2State extends State<ProvideServices2> {
     vehicleColorController.dispose();
     vehicleNumberController.dispose();
     carLicenseController.dispose();
+    carLicenseEndDateController.dispose();
     userLicenseController.dispose();
     super.dispose();
+  }
+
+  /// Converts Arabic/Eastern Arabic numeral characters to Western digits
+  String _convertArabicNumerals(String text) {
+    StringBuffer result = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      int code = text.codeUnitAt(i);
+      if (code >= 0x0660 && code <= 0x0669) {
+        result.write(code - 0x0660);
+      } else if (code >= 0x06F0 && code <= 0x06F9) {
+        result.write(code - 0x06F0);
+      } else {
+        result.write(text[i]);
+      }
+    }
+    return result.toString();
+  }
+
+  Future<void> _pickDate() async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        carLicenseEndDateController.text =
+            "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+      });
+    }
   }
 
   Future<void> _pickImage(String type) async {
@@ -126,69 +162,201 @@ class _ProvideServices2State extends State<ProvideServices2> {
       }
     });
 
+    if (type == 'carPhoto') return; // Don't scan car photos for text
+
     // Process OCR
-    final inputImage = InputImage.fromFile(file);
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-    final RecognizedText recognizedText =
-        await textRecognizer.processImage(inputImage);
+    try {
+      String? ocrText;
 
-    print("--- Extracted Data for $type License ---");
-    _extractAndPrintData(recognizedText.text);
-    print("----------------------------------------");
+      // Pass 1: Latin recognizer
+      final inputImage = InputImage.fromFile(file);
+      final textRecognizer =
+          TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText =
+          await textRecognizer.processImage(inputImage);
+      ocrText = recognizedText.text;
+      textRecognizer.close();
 
-    textRecognizer.close();
+      // Normalize Arabic numerals using Unicode codepoint ranges
+      String fullText = _convertArabicNumerals(ocrText);
+      print("Normalized Text for $type License (Pass 1): $fullText");
+
+      _extractAndFillData(fullText, type);
+
+      // Pass 2: If fields are still empty, try default recognizer
+      bool needsRetry =
+          (type == 'user' && userLicenseController.text.isEmpty) ||
+              (type == 'car' && carLicenseController.text.isEmpty);
+
+      if (needsRetry) {
+        try {
+          final inputImage2 = InputImage.fromFile(file);
+          final textRecognizer2 = TextRecognizer();
+          final RecognizedText recognizedText2 =
+              await textRecognizer2.processImage(inputImage2);
+
+          String fullText2 = _convertArabicNumerals(recognizedText2.text);
+          print("Normalized Text for $type License (Pass 2): $fullText2");
+          _extractAndFillData(fullText2, type);
+          textRecognizer2.close();
+        } catch (e) {
+          print("OCR Pass 2 Error: $e");
+        }
+      }
+
+      // Pass 3: Cloud Vision API (supports Arabic numerals)
+      bool stillNeedsRetry =
+          (type == 'user' && userLicenseController.text.isEmpty) ||
+              (type == 'car' && carLicenseController.text.isEmpty);
+
+      if (stillNeedsRetry) {
+        try {
+          print("OCR Pass 3: Trying Cloud Vision for $type license...");
+          final cloudVision = CloudVisionService();
+          String? cloudText = await cloudVision.detectText(file);
+          if (cloudText != null) {
+            String convertedText = _convertArabicNumerals(cloudText);
+            print("Cloud Vision text for $type: $convertedText");
+            _extractAndFillData(convertedText, type);
+          }
+        } catch (e) {
+          print("OCR Pass 3 (Cloud Vision) Error: $e");
+        }
+      }
+    } catch (e) {
+      print("OCR Error: $e");
+    }
   }
 
-  void _extractAndPrintData(String text) {
-    // Basic heuristics for extraction
-    // ID: Look for 14 digits (Egypt national ID format)
-    final idRegex = RegExp(r'\b\d{14}\b');
-    final idMatch = idRegex.firstMatch(text);
-    if (idMatch != null) {
-      print("ID: ${idMatch.group(0)}");
-    } else {
-      print("ID: Not Found");
-    }
+  void _extractAndFillData(String text, String type) {
+    // Clean text: remove non-alphanumeric characters except spaces/newlines to simplify processing?
+    // Actually, getting raw text is better.
 
-    // Dates: Look for dd/mm/yyyy or yyyy/mm/dd
-    final dateRegex = RegExp(r'\b\d{2,4}[/-]\d{2}[/-]\d{2,4}\b');
-    final dates = dateRegex.allMatches(text);
+    if (type == 'user') {
+      // User License/ID Card logic
+      // target: 14 digit National ID
 
-    // Sort logic could be complex (which is creation vs end),
-    // for now just printing all found dates.
-    // Usually creation date is earlier than end date.
-    List<String> foundDates = dates.map((m) => m.group(0)!).toList();
+      // Strategy: Find all sequences of digits, potentially separated by spaces
+      // normalization removed spaces? No.
 
-    if (foundDates.isNotEmpty) {
-      // Attempt to parse and sort to guess which is which
-      print("Found Dates: $foundDates");
-      // A simple heuristic: earliest is creation, latest is end?
-      // This depends heavily on the license format.
-    } else {
-      print("Dates: Not Found");
+      // Remove all non-digit characters to check for a continuous stream of 14 digits?
+      // No, that might merge different numbers (e.g. date + id).
+
+      // Regex to find 10-20 digits allow dashes and spaces
+      // e.g. 1234 5678 9012 34 OR 123456789-005
+      final idRegex = RegExp(r'\d[\s\d-]{9,20}\d');
+      final matches = idRegex.allMatches(text);
+
+      String? bestCandidate;
+
+      for (final match in matches) {
+        String raw = match.group(0)!;
+        String digitsOnly =
+            raw.replaceAll(RegExp(r'\D'), ''); // Remove spaces/symbols
+
+        if (digitsOnly.length >= 10 && digitsOnly.length <= 16) {
+          // Prefer 14 digits (Egypt)
+          // But accept 10+ (USA driver's license often 9-12)
+          if (digitsOnly.length == 14) {
+            bestCandidate = digitsOnly;
+          } else if (bestCandidate == null ||
+              (bestCandidate.length != 14 &&
+                  digitsOnly.length > bestCandidate.length)) {
+            // Keep longest candidate if we don't have a 14-digit one
+            bestCandidate = digitsOnly;
+          }
+        }
+      }
+
+      if (bestCandidate != null) {
+        setState(() {
+          userLicenseController.text = bestCandidate!;
+        });
+      }
+    } else if (type == 'car') {
+      // Car License Logic
+      // Target: 3-4 digit number (Standard Egyptian Plate)
+      // Text might be: "س ب ر 1234" or "1 2 3 4"
+
+      // Find all numbers in the text, allowing for spaces in between digits
+      // e.g. "1 2 3 4" or "1234"
+      // Regex: digit followed by optional space/hyphen then another digit
+      final regex = RegExp(r'\d[\d\s-]*\d');
+      final matches = regex.allMatches(text);
+
+      String? bestCandidate;
+      String? shortCandidate;
+      String? longCandidate;
+
+      for (final match in matches) {
+        String num = match.group(0)!;
+        String cleanNum = num.replaceAll(
+            RegExp(r'[\s-]+'), ''); // remove all spaces and hyphens
+
+        int len = cleanNum.length;
+
+        // Check for Plate Number (3-4)
+        if (len >= 3 && len <= 4) {
+          int val = int.tryParse(cleanNum) ?? 0;
+          // Filter out likely years
+          if (len == 4 && (val >= 1900 && val <= 2100)) {
+            continue;
+          }
+          if (shortCandidate == null) shortCandidate = cleanNum;
+        }
+
+        // Check for Long ID/License/Chassis (10-14+)
+        if (len >= 10) {
+          // Likely a license number (National ID is 14)
+          if (longCandidate == null || len > longCandidate.length) {
+            longCandidate = cleanNum;
+          }
+        }
+      }
+
+      // Priority: If user uploaded a driver's license (14 digits) to Car License field, use it if no short number found?
+      // Or prioritize long number if present?
+      // Since user complained about 14 digit number not showing, let's prefer it if found.
+      bestCandidate = longCandidate ?? shortCandidate;
+
+      if (bestCandidate != null) {
+        setState(() {
+          carLicenseController.text = bestCandidate!;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              "Could not detect license number. If using Arabic numerals, please enter manually."),
+          duration: Duration(seconds: 4),
+        ));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(80),
         child: AppBar(
           flexibleSpace: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 800),
+            duration: const Duration(milliseconds: 1000),
             child: Container(
               key: ValueKey<int>(_currentImageIndex),
               decoration: BoxDecoration(
                 image: DecorationImage(
                   image: AssetImage(sponsorImages[_currentImageIndex]),
                   fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                      Colors.black.withOpacity(0.4), BlendMode.darken),
                 ),
               ),
             ),
           ),
           centerTitle: true,
-          backgroundColor: Colors.black87,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
         ),
       ),
       body: Container(
@@ -199,444 +367,527 @@ class _ProvideServices2State extends State<ProvideServices2> {
             fit: BoxFit.cover,
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              const Text(
-                'Step 2-2: Working State',
-                style: TextStyle(
-                  color: CupertinoColors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // Working Time Selection
-              const Text(
-                'Choose working time:\n(Note: You can select multiple)',
-                style: TextStyle(fontSize: 18, color: CupertinoColors.white),
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 60,
-                children: [
-                  buildCircleButton("Morning", Icons.wb_sunny),
-                  buildCircleButton("Afternoon", Icons.wb_twilight),
-                  buildCircleButton("Night", Icons.nights_stay),
-                ],
-              ),
-              const SizedBox(height: 40),
-
-              // Gender Selection
-              const Text(
-                'Who do you want to deal with?',
-                style: TextStyle(
-                  color: CupertinoColors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  buildGenderButton("Male"),
-                  const SizedBox(width: 20),
-                  buildGenderButton("Female"),
-                  const SizedBox(width: 20),
-                  buildGenderButton("NeverMind"),
-                ],
-              ),
-              const SizedBox(height: 40),
-
-              // Transportation Selection
-              const Text(
-                'Do you have transportation?',
-                style: TextStyle(
-                  color: CupertinoColors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: transportationOptions.map((option) {
-                  return ChoiceChip(
-                    label: Text(option),
-                    selected: selectedTransportation == option,
-                    onSelected: (selected) {
-                      setState(() {
-                        selectedTransportation = selected ? option : null;
-                        if (!selected) {
-                          vehicleNameController.clear();
-                          vehicleColorController.clear();
-                          vehicleNumberController.clear();
-                        }
-                      });
-                    },
-                    selectedColor: Colors.green,
-                    backgroundColor: Colors.blueAccent,
-                    labelStyle: TextStyle(
-                      color: selectedTransportation == option
-                          ? Colors.white
-                          : Colors.white,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: Text(
+                    'Step 2 of 4',
+                    style: TextStyle(
+                      color: Colors.blueAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Center(
+                  child: Text(
+                    'Work Preferences',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
 
-              // Vehicle Details (only shown for Car or Motorbike)
-              if (selectedTransportation == 'Car' ||
-                  selectedTransportation == 'Motorbike')
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // SECTION: Working Time
+                _buildSectionHeader(
+                    'Availability', 'Select your preferred shifts'),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Vehicle Details',
-                      style: TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Vehicle Name
-                    TextField(
-                      controller: vehicleNameController,
-                      decoration: InputDecoration(
-                        labelText: '${selectedTransportation} Name',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 10),
-                    // Vehicle Model (Year Dropdown)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        border: Border.all(color: Colors.white54),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedCarModelYear,
-                          hint: Text(
-                            'Select ${selectedTransportation} Model Year',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          dropdownColor: Colors.grey[800],
-                          icon: const Icon(Icons.arrow_drop_down,
-                              color: Colors.white),
-                          isExpanded: true,
-                          items: carModelYears.map((String year) {
-                            return DropdownMenuItem<String>(
-                              value: year,
-                              child: Text(year,
-                                  style: const TextStyle(color: Colors.white)),
-                            );
-                          }).toList(),
-                          onChanged: (newValue) {
-                            setState(() {
-                              selectedCarModelYear = newValue;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: vehicleColorController,
-                      decoration: InputDecoration(
-                        labelText: '${selectedTransportation} Color',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: vehicleNumberController,
-                      decoration: InputDecoration(
-                        labelText: '${selectedTransportation} Number',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 20),
-
-                    const Text(
-                      'License Details',
-                      style: TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Car License Text
-                    TextField(
-                      controller: carLicenseController,
-                      decoration: const InputDecoration(
-                        labelText: 'Car License Number',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white10,
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 10),
-                    // User License Text
-                    TextField(
-                      controller: userLicenseController,
-                      decoration: const InputDecoration(
-                        labelText: 'User License Number',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white10,
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Image Pickers
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              const Text("Car License Image",
-                                  style: TextStyle(color: Colors.white)),
-                              const SizedBox(height: 5),
-                              GestureDetector(
-                                onTap: () => _pickImage('car'),
-                                child: Container(
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white10,
-                                    border: Border.all(color: Colors.white),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: carLicenseImage != null
-                                      ? Image.file(carLicenseImage!,
-                                          fit: BoxFit.cover)
-                                      : const Icon(Icons.camera_alt,
-                                          color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              const Text("User License Image",
-                                  style: TextStyle(color: Colors.white)),
-                              const SizedBox(height: 5),
-                              GestureDetector(
-                                onTap: () => _pickImage('user'),
-                                child: Container(
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white10,
-                                    border: Border.all(color: Colors.white),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: userLicenseImage != null
-                                      ? Image.file(userLicenseImage!,
-                                          fit: BoxFit.cover)
-                                      : const Icon(Icons.camera_alt,
-                                          color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Car Photo Upload (New)
-                    Column(
-                      children: [
-                        const Text("Car Photo",
-                            style: TextStyle(color: Colors.white)),
-                        const SizedBox(height: 5),
-                        GestureDetector(
-                          onTap: () => _pickImage('carPhoto'),
-                          child: Container(
-                            height: 150,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white10,
-                              border: Border.all(color: Colors.white),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: carPhoto != null
-                                ? Image.file(carPhoto!, fit: BoxFit.cover)
-                                : const Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.directions_car,
-                                          color: Colors.white, size: 40),
-                                      SizedBox(height: 5),
-                                      Text("Upload Car Photo",
-                                          style:
-                                              TextStyle(color: Colors.white70)),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildTimeCard("Morning", Icons.wb_sunny_rounded),
+                    _buildTimeCard("Afternoon", Icons.wb_twilight_rounded),
+                    _buildTimeCard("Night", Icons.nights_stay_rounded),
                   ],
                 ),
-              const SizedBox(height: 40),
-              Center(
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (selectedTimes.isEmpty || selectedGender == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content:
-                                Text("Please select working time and gender")),
-                      );
-                      return;
-                    }
+                const SizedBox(height: 32),
 
-                    if ((selectedTransportation == 'Car' ||
-                            selectedTransportation == 'Motorbike') &&
-                        (vehicleNameController.text.isEmpty ||
-                            selectedCarModelYear == null ||
-                            vehicleColorController.text.isEmpty ||
-                            vehicleNumberController.text.isEmpty ||
-                            carLicenseController.text.isEmpty ||
-                            userLicenseController.text.isEmpty ||
-                            carLicenseImage == null ||
-                            carLicenseController.text.isEmpty ||
-                            userLicenseController.text.isEmpty ||
-                            carLicenseImage == null ||
-                            userLicenseImage == null ||
-                            carPhoto == null)) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                "Please fill all vehicle and license details")),
-                      );
-                      return;
-                    }
+                // SECTION: Gender
+                _buildSectionHeader(
+                    'Client Preference', 'Who do you prefer to assist?'),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _buildGenderCard("Male", Icons.male_rounded)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child:
+                            _buildGenderCard("Female", Icons.female_rounded)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _buildGenderCard("Any", Icons.people_alt_rounded,
+                            value: "NeverMind")),
+                  ],
+                ),
+                const SizedBox(height: 32),
 
-                    // Update registration data
-                    widget.registrationData['working_time'] =
-                        selectedTimes.toList();
-                    widget.registrationData['deal_with_gender'] =
-                        selectedGender;
-                    widget.registrationData['transportation_type'] =
-                        selectedTransportation;
-
-                    if (selectedTransportation == 'Car' ||
-                        selectedTransportation == 'Motorbike') {
-                      widget.registrationData['vehicle_name'] =
-                          vehicleNameController.text;
-                      widget.registrationData['vehicle_model_year'] =
-                          selectedCarModelYear;
-                      widget.registrationData['vehicle_color'] =
-                          vehicleColorController.text;
-                      widget.registrationData['vehicle_number'] =
-                          vehicleNumberController.text;
-                      widget.registrationData['car_license_number'] =
-                          carLicenseController.text;
-                      widget.registrationData['user_license_number'] =
-                          userLicenseController.text;
-
-                      // Images
-                      widget.registrationData['carLicenseImage'] =
-                          carLicenseImage;
-                      widget.registrationData['carLicenseImage'] =
-                          carLicenseImage;
-                      widget.registrationData['userLicenseImage'] =
-                          userLicenseImage;
-                      widget.registrationData['carPhoto'] = carPhoto;
-                    }
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProvideServices3(
-                          registrationData: widget.registrationData,
+                // SECTION: Transportation
+                _buildSectionHeader('Transportation', 'How will you commute?'),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: transportationOptions.map((option) {
+                    bool isSelected = selectedTransportation == option;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedTransportation = isSelected ? null : option;
+                          if (!isSelected &&
+                              option != 'Car' &&
+                              option != 'Motorbike') {
+                            vehicleNameController.clear();
+                            vehicleColorController.clear();
+                            vehicleNumberController.clear();
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.blueAccent
+                              : Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color:
+                                isSelected ? Colors.blueAccent : Colors.white24,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          option,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
                         ),
                       ),
                     );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 15),
-                    backgroundColor: Colors.blueAccent,
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+
+                // SECTION: Vehicle Details
+                if (selectedTransportation == 'Car' ||
+                    selectedTransportation == 'Motorbike') ...[
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader(
+                            'Vehicle Details', 'Information for verification',
+                            small: true),
+                        const SizedBox(height: 20),
+                        _buildGlassTextField(
+                          controller: vehicleNameController,
+                          label: '${selectedTransportation} Name/Brand',
+                          icon: Icons.directions_car_rounded,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Model Year Dropdown
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: selectedCarModelYear,
+                              hint: Text('Select Model Year',
+                                  style: TextStyle(color: Colors.white54)),
+                              dropdownColor: const Color(0xFF1E1E1E),
+                              icon: const Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: Colors.white70),
+                              isExpanded: true,
+                              items: carModelYears.map((String year) {
+                                return DropdownMenuItem<String>(
+                                  value: year,
+                                  child: Text(year,
+                                      style:
+                                          const TextStyle(color: Colors.white)),
+                                );
+                              }).toList(),
+                              onChanged: (val) =>
+                                  setState(() => selectedCarModelYear = val),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        _buildGlassTextField(
+                          controller: vehicleColorController,
+                          label: 'Color',
+                          icon: Icons.color_lens_rounded,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassTextField(
+                          controller: vehicleNumberController,
+                          label: 'Plate No.',
+                          icon: Icons.pin_rounded,
+                        ),
+                        const SizedBox(height: 24),
+
+                        _buildSectionHeader(
+                            'License Uploads', 'Clear photos required',
+                            small: true),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Expanded(
+                                child: _buildImageUploadCard(
+                                    'Vehicle License', 'car', carLicenseImage)),
+                            const SizedBox(width: 16),
+                            Expanded(
+                                child: _buildImageUploadCard('Driver License',
+                                    'user', userLicenseImage)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildImageUploadCard(
+                            'Vehicle Photo', 'carPhoto', carPhoto,
+                            fullWidth: true),
+
+                        const SizedBox(height: 24),
+                        _buildGlassTextField(
+                          controller: carLicenseController,
+                          label: 'Vehicle License No.',
+                          icon: Icons.badge_rounded,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassTextField(
+                          controller: carLicenseEndDateController,
+                          label: 'License Expiry',
+                          icon: Icons.event_rounded,
+                          readOnly: true,
+                          onTap: _pickDate,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassTextField(
+                          controller: userLicenseController,
+                          label: 'Driver License No.',
+                          icon: Icons.subtitles_rounded,
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text(
-                    "Submit",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  const SizedBox(height: 32),
+                ],
+
+                // Submit Button
+                Container(
+                  width: double.infinity,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Continue',
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget buildCircleButton(String text, IconData icon) {
-    bool isSelected = selectedTimes.contains(text);
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          isSelected ? selectedTimes.remove(text) : selectedTimes.add(text);
-        });
-      },
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: isSelected ? Colors.green : Colors.blueAccent,
-            child: Icon(icon, color: Colors.white, size: 30),
-          ),
-          const SizedBox(height: 8),
-          Text(text, style: const TextStyle(color: Colors.white)),
-        ],
+  void _handleSubmit() {
+    if (selectedTimes.isEmpty || selectedGender == null) {
+      _showError("Please select availability and client preference.");
+      return;
+    }
+
+    if ((selectedTransportation == 'Car' ||
+            selectedTransportation == 'Motorbike') &&
+        (vehicleNameController.text.isEmpty ||
+            selectedCarModelYear == null ||
+            vehicleColorController.text.isEmpty ||
+            vehicleNumberController.text.isEmpty ||
+            carLicenseController.text.isEmpty ||
+            carLicenseEndDateController.text.isEmpty ||
+            userLicenseController.text.isEmpty ||
+            carLicenseImage == null ||
+            userLicenseImage == null ||
+            carPhoto == null)) {
+      _showError("Please fill all vehicle and license details.");
+      return;
+    }
+
+    widget.registrationData['working_time'] = selectedTimes.toList();
+    widget.registrationData['deal_with_gender'] = selectedGender;
+    widget.registrationData['transportation_type'] = selectedTransportation;
+
+    if (selectedTransportation == 'Car' ||
+        selectedTransportation == 'Motorbike') {
+      widget.registrationData['vehicle_name'] = vehicleNameController.text;
+      widget.registrationData['vehicle_model_year'] = selectedCarModelYear;
+      widget.registrationData['vehicle_color'] = vehicleColorController.text;
+      widget.registrationData['vehicle_number'] = vehicleNumberController.text;
+      widget.registrationData['car_license_number'] = carLicenseController.text;
+      widget.registrationData['car_licence_end_date'] =
+          carLicenseEndDateController.text;
+      widget.registrationData['user_license_number'] =
+          userLicenseController.text;
+
+      // Images
+      widget.registrationData['carLicenseImage'] = carLicenseImage;
+      widget.registrationData['userLicenseImage'] = userLicenseImage;
+      widget.registrationData['carPhoto'] = carPhoto;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProvideServices3(
+          registrationData: widget.registrationData,
+        ),
       ),
     );
   }
 
-  Widget buildGenderButton(String gender) {
-    return ElevatedButton(
-      onPressed: () {
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String subtitle,
+      {bool small = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: small ? 18 : 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(color: Colors.white54, fontSize: 13),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeCard(String shift, IconData icon) {
+    bool isSelected = selectedTimes.contains(shift);
+    return GestureDetector(
+      onTap: () {
         setState(() {
-          selectedGender = gender;
+          isSelected ? selectedTimes.remove(shift) : selectedTimes.add(shift);
         });
       },
-      style: ElevatedButton.styleFrom(
-        backgroundColor:
-            selectedGender == gender ? Colors.green : Colors.blueAccent,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.26,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.blueAccent.withOpacity(0.15)
+              : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.blueAccent : Colors.white12,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon,
+                color: isSelected ? Colors.blueAccent : Colors.white54,
+                size: 32),
+            const SizedBox(height: 12),
+            Text(
+              shift,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Text(gender, style: const TextStyle(color: Colors.white)),
+    );
+  }
+
+  Widget _buildGenderCard(String label, IconData icon, {String? value}) {
+    String actualValue = value ?? label;
+    bool isSelected = selectedGender == actualValue;
+    return GestureDetector(
+      onTap: () => setState(() => selectedGender = actualValue),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blueAccent : Colors.black.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: isSelected ? Colors.transparent : Colors.white12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon,
+                color: isSelected ? Colors.white : Colors.white54, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
+    return TextFormField(
+      controller: controller,
+      readOnly: readOnly,
+      onTap: onTap,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        prefixIcon: Icon(icon, color: Colors.blueAccent.withOpacity(0.7)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.08),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.white24, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      ),
+    );
+  }
+
+  Widget _buildImageUploadCard(String label, String type, File? imageFile,
+      {bool fullWidth = false}) {
+    return GestureDetector(
+      onTap: () => _pickImage(type),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          Container(
+            height: fullWidth ? 160 : 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color:
+                      imageFile != null ? Colors.greenAccent : Colors.white24,
+                  width: 1.5),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: imageFile != null
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.file(imageFile, fit: BoxFit.cover),
+                      Container(color: Colors.black26),
+                      const Center(
+                          child: Icon(Icons.check_circle_rounded,
+                              color: Colors.greenAccent, size: 32)),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                          fullWidth
+                              ? Icons.add_a_photo_rounded
+                              : Icons.document_scanner_rounded,
+                          color: Colors.white54,
+                          size: 32),
+                      const SizedBox(height: 8),
+                      Text("Tap to upload",
+                          style:
+                              TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -45,9 +45,9 @@ class WebServices {
       var result = await FlutterImageCompress.compressAndGetFile(
         file.absolute.path,
         outPath,
-        quality: 25, // Reduced quality to avoid 502 Payload Too Large
-        minWidth: 1024, // Resize validation
-        minHeight: 1024,
+        quality: 20, // Aggressive compression to prevent PHP memory exhaustion
+        minWidth: 400, // Drastically reduced dimensions
+        minHeight: 400, // Drastically reduced dimensions
         format: CompressFormat.jpeg,
       );
 
@@ -56,6 +56,8 @@ class WebServices {
         File compressedFile = File(result.path);
         print('Compressed size: ${compressedFile.lengthSync()}');
         return compressedFile;
+      } else {
+        print('Compression returned null, using original file!');
       }
       return file;
     } catch (e) {
@@ -71,7 +73,7 @@ class WebServices {
       // This prevents "null" string being sent or backend crashing on unexpected types
       Map<String, dynamic> sanitizedData = {};
       data.forEach((key, value) {
-        if (value != null) {
+        if (value != null && value != "") {
           sanitizedData[key] = value;
         }
       });
@@ -190,6 +192,74 @@ class WebServices {
     } catch (e) {
       print("Add Sponsor Error: $e");
       rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getUserByEmail(String email) async {
+    try {
+      // 1. Authenticate as admin using exact backend instructions
+      String token = "";
+      try {
+        Response loginResp = await Dio().post(
+            'http://161.35.51.188:5001/api/auth/login',
+            data: {"uname": "ts2025", "password": "123456"});
+
+        if (loginResp.statusCode == 200 && loginResp.data != null) {
+          token =
+              loginResp.data['token'] ?? loginResp.data['accessToken'] ?? "";
+        }
+      } catch (e) {
+        print("Admin Login Error: $e");
+        return null; // Stop if we can't get a token
+      }
+
+      if (token.isEmpty) {
+        print("Error: No admin token received.");
+        return null;
+      }
+
+      // 2. Fetch users using the Bearer token from the exact URL
+      Response response = await Dio().get(
+        'http://161.35.51.188:5001/api/users',
+        options: Options(
+          headers: {
+            "Authorization": "Bearer $token",
+          },
+        ),
+      );
+      List<dynamic> users = [];
+
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          users = response.data['data'];
+        } else if (response.data is List) {
+          users = response.data;
+        }
+
+        // Filter valid user maps
+        final validUsers = users.where((element) => element is Map).toList();
+
+        // Find user by email
+        // Case-insensitive email comparison is usually safer
+        final user = validUsers.firstWhere(
+            (u) =>
+                (u['email'] as String? ?? u['user_email'] as String?)
+                    ?.toLowerCase() ==
+                email.toLowerCase(),
+            orElse: () => null);
+
+        if (user != null) {
+          // ensure 'statu' contains the status (the dev's json showed "status": 2 instead of "statu")
+          if (user.containsKey('status')) {
+            user['statu'] = user['status'];
+          }
+          return user as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Get User By Email Error: $e");
+      return null;
     }
   }
 }

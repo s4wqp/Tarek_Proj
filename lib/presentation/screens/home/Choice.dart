@@ -147,7 +147,7 @@ class _ChoiceState extends State<Choice> {
         height: double.infinity,
         child: Column(
           children: [
-            const SizedBox(height: 100),
+            const SizedBox(height: 40),
             Container(
               alignment: Alignment.centerLeft,
               padding: const EdgeInsets.only(left: 20),
@@ -173,7 +173,7 @@ class _ChoiceState extends State<Choice> {
                 ],
               ),
             ),
-            const SizedBox(height: 80),
+            const SizedBox(height: 40),
             const Text(
               "Step 2 : Select what you need.",
               style: TextStyle(
@@ -187,16 +187,24 @@ class _ChoiceState extends State<Choice> {
               "You want to:\n Note: You can select both",
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                buildCircleButton("Provide a service", Icons.add_card),
-                const SizedBox(width: 50),
-                buildCircleButton("Looking for a service", Icons.search),
-              ],
+            const SizedBox(height: 30),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                      child: buildCircleButton(
+                          "Provide a service", Icons.add_card)),
+                  const SizedBox(width: 20),
+                  Expanded(
+                      child: buildCircleButton(
+                          "Looking for a service", Icons.search)),
+                ],
+              ),
             ),
-            const SizedBox(height: 60),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed:
                   selectedOptions.isNotEmpty ? navigateToSelectedPages : null,

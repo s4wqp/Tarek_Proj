@@ -2,9 +2,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:tarek_proj/presentation/screens/auth/Login.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:tarek_proj/presentation/screens/home/Choice.dart';
 import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
+import 'package:tarek_proj/presentation/screens/services/provide_services.dart';
 
 import 'package:tarek_proj/presentation/screens/services/provide_services2.dart';
+import 'package:tarek_proj/presentation/screens/services/provide_services4.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

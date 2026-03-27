@@ -210,8 +210,10 @@ class _ProvideServices3State extends State<ProvideServices3> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
                   ElevatedButton.icon(
                     onPressed: _isLoadingLocation ? null : _getCurrentLocation,

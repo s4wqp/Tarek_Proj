@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
+
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:dio/dio.dart';
@@ -272,41 +272,6 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
 
     try {
       List<String> imageUrls = [];
-
-      // 1. Upload Images to Supabase
-      try {
-        final supabase = Supabase.instance.client;
-        for (var image in _images) {
-          final fileName =
-              '${DateTime.now().millisecondsSinceEpoch}_${image.path.split('/').last}';
-          final path = 'sponsor_images/$fileName';
-
-          await supabase.storage.from('provider-documents').upload(
-                path,
-                image,
-                fileOptions:
-                    const FileOptions(cacheControl: '3600', upsert: false),
-              );
-
-          final publicUrl =
-              supabase.storage.from('provider-documents').getPublicUrl(path);
-          imageUrls.add(publicUrl);
-        }
-      } catch (uploadError) {
-        print("Supabase (Backup) Upload Error: $uploadError");
-        if (mounted) {
-          String msg = 'Backup storage upload failed (Main upload continuing)';
-          if (uploadError.toString().contains('host lookup')) {
-            msg = 'Backup storage DNS error (Check Emulator Wifi)';
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(msg),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
 
       // 2. Submit to External API
       try {

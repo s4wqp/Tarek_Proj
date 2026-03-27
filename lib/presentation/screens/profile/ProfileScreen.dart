@@ -8,6 +8,9 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAdmin =
+        FirebaseAuth.instance.currentUser?.email == 'admin@gmail.com';
+
     return Scaffold(
       backgroundColor: const Color(0xff030927),
       appBar: AppBar(
@@ -35,23 +38,25 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (context) => const AddSponsorScreen()),
-                );
-              },
-              icon: const Icon(Icons.add_business),
-              label: const Text('Add Business as Sponsor'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+            if (isAdmin) ...[
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (context) => const AddSponsorScreen()),
+                  );
+                },
+                icon: const Icon(Icons.add_business),
+                label: const Text('Add Business as Sponsor'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
             ElevatedButton.icon(
               onPressed: () async {
                 try {

@@ -9,6 +9,7 @@ class PersonalInfo4 extends StatefulWidget {
   final String arabicName;
   final String jobTitle;
   final String phone;
+  final String whatsapp;
   final String birthDate;
 
   const PersonalInfo4({
@@ -20,6 +21,7 @@ class PersonalInfo4 extends StatefulWidget {
     required this.arabicName,
     required this.jobTitle,
     required this.phone,
+    required this.whatsapp,
     required this.birthDate,
   });
 
@@ -55,6 +57,7 @@ class _PersonalInfo4State extends State<PersonalInfo4> {
       'arabicName': widget.arabicName,
       'jobTitle': widget.jobTitle,
       'phone': widget.phone,
+      'whatsapp_number': widget.whatsapp,
       'birthDate': widget.birthDate,
       'gender': selectedGender,
       'city': selectedCity,
@@ -75,6 +78,8 @@ class _PersonalInfo4State extends State<PersonalInfo4> {
     return Scaffold(
       appBar: AppBar(title: const Text('Demographics'), centerTitle: true),
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage("images/bg.jpg"),

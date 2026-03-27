@@ -12,40 +12,29 @@ class ProvideServices extends StatefulWidget {
 }
 
 class _ProvideServicesState extends State<ProvideServices> {
-  List<String> serviceOptions = [
-    // Transportation & Delivery
-    "Motorbike Rider",
-    "Car Driver",
-    "Delivery Service",
-    "Package Courier",
+  List<String> providerOptions = [
+    "Provide Ride in my car",
+    "Provide Drive for other",
+    "Provide companion senior",
+    "Provide baby sitter",
+    "Provide nursing",
+    "Provide physical therapy",
+    "Provide clean home",
+    "Provide private Teaceher",
+    "Provide room or Appartment",
+    "Other"
+  ];
 
-    // Home & Property
-    "Home Cleaning",
-    "Farm Cleaning",
-    "Gardening & Landscaping",
-    "Handyman & Repairs",
-    "Pest Control",
-
-    // Education & Tutoring
-    "Private Teacher",
-    "Language Tutor",
-    "Music Instructor",
-
-    // Care & Companionship
-    "Companion / Caregiver",
-    "Babysitter",
-    "Nursing Care",
-    "Physical Therapy",
-    "Elderly Assistance",
-    "Pet Sitting & Walking",
-
-    // Professional Services
-    "IT Support",
-    "Graphic Design",
-    "Event Planning",
-    "Photography & Videography",
-
-    // Miscellaneous
+  List<String> seekerOptions = [
+    "Ask Ride",
+    "Ask Driver for My car",
+    "Ask companion for senior",
+    "Ask baby sitter",
+    "Ask for nursing",
+    "Ask physical therapy",
+    "Ask clean home",
+    "Ask Teacher",
+    "Ask rent room or Appartment",
     "Other"
   ];
 
@@ -56,6 +45,7 @@ class _ProvideServicesState extends State<ProvideServices> {
   @override
   Widget build(BuildContext context) {
     bool isProvider = widget.registrationData['serviceType'] == 'Provider';
+    List<String> currentOptions = isProvider ? providerOptions : seekerOptions;
 
     return Scaffold(
       appBar: AppBar(
@@ -106,9 +96,9 @@ class _ProvideServicesState extends State<ProvideServices> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 1.6,
                   ),
-                  itemCount: serviceOptions.length,
+                  itemCount: currentOptions.length,
                   itemBuilder: (context, index) {
-                    String option = serviceOptions[index];
+                    String option = currentOptions[index];
                     bool isSelected = selectedServices.contains(option);
                     return GestureDetector(
                       onTap: () {
@@ -118,7 +108,7 @@ class _ProvideServicesState extends State<ProvideServices> {
                             if (!isOtherSelected) {
                               otherServiceController.clear();
                               selectedServices.removeWhere((service) =>
-                                  serviceOptions.contains(service));
+                                  currentOptions.contains(service));
                             }
                           } else {
                             if (!isProvider) {

@@ -237,6 +237,8 @@ class _SearchServices3State extends State<SearchServices3> {
     return Scaffold(
       appBar: AppBar(title: const Text('Document Upload'), centerTitle: true),
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
               image: AssetImage('images/bg.jpg'), fit: BoxFit.cover),

@@ -229,8 +229,10 @@ class _Searchservice2State extends State<Searchservice2> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              runSpacing: 10,
               children: [
                 ElevatedButton.icon(
                   onPressed: _isLoadingLocation ? null : _getCurrentLocation,

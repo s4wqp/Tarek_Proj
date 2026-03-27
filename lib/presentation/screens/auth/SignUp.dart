@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:tarek_proj/presentation/screens/auth/personal_info2.dart';
+import 'package:tarek_proj/data/web_services/web_services.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -18,6 +19,7 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscureTextPass = true;
   bool _obscureTextRePass = true;
   String? _emailErrorText;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -88,6 +90,10 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
 
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       // 1. Check if email already exists in Auth
       final methods =
@@ -95,6 +101,7 @@ class _SignUpPageState extends State<SignUpPage> {
       if (methods.isNotEmpty) {
         setState(() {
           _emailErrorText = "This email is already in use. Please try another.";
+          _isLoading = false;
         });
         return;
       }
@@ -110,6 +117,7 @@ class _SignUpPageState extends State<SignUpPage> {
           setState(() {
             _emailErrorText =
                 "This email is already in use. Please try another.";
+            _isLoading = false;
           });
           return;
         }
@@ -117,8 +125,22 @@ class _SignUpPageState extends State<SignUpPage> {
         print("Firestore email check failed: $e");
       }
 
-      // 3. Email is available, proceed to next step
+      // 3. Check custom backend (Main source of truth for 400 Username exists)
+      final existingUser = await WebServices().getUserByEmail(email);
+      if (existingUser != null) {
+        setState(() {
+          _emailErrorText =
+              "This email is already registered on our servers. Please try another.";
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 4. Email is available, proceed to next step
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -131,11 +153,18 @@ class _SignUpPageState extends State<SignUpPage> {
       if (e.code == 'invalid-email') {
         setState(() {
           _emailErrorText = "Invalid email format.";
+          _isLoading = false;
         });
         return;
       }
+      setState(() {
+        _isLoading = false;
+      });
       showErrorDialog("Error", errorMessage);
     } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
       showErrorDialog("Error", e.toString());
     }
   }
@@ -250,8 +279,17 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                   const SizedBox(height: 40),
                   ElevatedButton(
-                    onPressed: handleSignUp,
-                    child: const Text('Next'),
+                    onPressed: _isLoading ? null : handleSignUp,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.0,
+                            ),
+                          )
+                        : const Text('Next'),
                   ),
                 ],
               ),

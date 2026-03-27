@@ -10,6 +10,7 @@ import 'approval_waiting.dart';
 import 'package:tarek_proj/presentation/screens/home/Choice.dart';
 import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
 import 'package:tarek_proj/presentation/screens/home/ServicesHomeScreen.dart';
+import 'package:tarek_proj/presentation/screens/home/service_router.dart';
 import 'package:tarek_proj/data/web_services/web_services.dart';
 
 class LoginPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool _isObscured = true;
 
   List<Map<String, dynamic>> sponsors = [];
 
@@ -59,10 +61,26 @@ class _LoginPageState extends State<LoginPage> {
 
             for (var data in validSponsors) {
               final mapData = data as Map;
-              String imageUrl =
-                  mapData['imag1_photo'] ?? mapData['image'] ?? '';
+              final String webSiteUrl = mapData['sponsor_web_site'] ?? '';
+              final Set<String> uniqueUrls = {};
 
-              if (imageUrl.isNotEmpty) {
+              // Check for multiple image keys and collect unique URLs
+              List<String> potentialKeys = [
+                'imag1_photo',
+                'imag2_photo',
+                'imag3_photo',
+                'image' // Legacy fallback
+              ];
+
+              for (String key in potentialKeys) {
+                final val = mapData[key];
+                if (val != null && val is String && val.isNotEmpty) {
+                  uniqueUrls.add(val);
+                }
+              }
+
+              for (String rawUrl in uniqueUrls) {
+                String imageUrl = rawUrl;
                 if (!imageUrl.startsWith('http')) {
                   // Normalize path to prevent double slashes
                   if (imageUrl.startsWith('/')) {
@@ -74,7 +92,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 mappedSponsors.add({
                   "image": imageUrl,
-                  "url": mapData['sponsor_web_site'] ?? '',
+                  "url": webSiteUrl,
                 });
               }
             }
@@ -132,55 +150,56 @@ class _LoginPageState extends State<LoginPage> {
 
       User? user = userCredential.user;
       if (user != null) {
+        // Admin bypass — skip API/Firestore checks
+        if (email == 'admin@gmail.com') {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const Homepage()),
+            );
+          }
+          return;
+        }
+
         // Check approval status
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        // Check approval status from Web API
+        final userData = await WebServices().getUserByEmail(email);
 
-        if (doc.exists) {
-          final approvalStatus = doc.data()?['approvalStatus'] ?? 'pending';
-          final String? serviceType = doc.data()?['serviceType'];
+        if (userData != null) {
+          final int status = userData['statu'] ?? 1; // 1: pending
+          final int typeId = userData['u_type_id'] ?? 1; // 1: Seeker
+          final int catId = userData['cat_id'] ?? 0;
 
-          // Logic to check isProvider/isSeeker with fallback to serviceType string
-          final bool isProvider = doc.data()?['isProvider'] ??
-              (serviceType == 'Provider' || serviceType == 'Both');
-          final bool isSeeker = doc.data()?['isSeeker'] ??
-              (serviceType == 'Seeker' || serviceType == 'Both');
+          // Map status
+          String approvalStatus = 'pending';
+          if (status == 2) {
+            approvalStatus = 'approved';
+          } else if (status == 3) {
+            approvalStatus = 'rejected';
+          }
+
+          // Map type: 1=Seeker, 2=Provider, 3=Both
+          final bool isProvider = (typeId == 2 || typeId == 3);
+
+          // Get the service-specific dashboard
+          final Widget dashboard = catId > 0
+              ? getServiceDashboard(catId, isProvider: isProvider)
+              : (isProvider ? const Homepage() : const ServicesHomeScreen());
 
           if (approvalStatus == 'approved') {
             if (mounted) {
-              if (isProvider) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const Homepage()),
-                );
-              } else if (isSeeker) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const ServicesHomeScreen()),
-                );
-              } else {
-                // Should not happen if data is correct, but fallback to Choice
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const Choice(registrationData: {})),
-                );
-              }
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => dashboard),
+              );
             }
           } else if (approvalStatus == 'pending') {
             if (mounted) {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => ApprovalWaitingPage(
-                        targetScreen: isProvider
-                            ? const Homepage()
-                            : (isSeeker
-                                ? const ServicesHomeScreen()
-                                : const Choice(registrationData: {})))),
+                    builder: (context) =>
+                        ApprovalWaitingPage(targetScreen: dashboard)),
               );
             }
           } else if (approvalStatus == 'rejected') {
@@ -189,14 +208,60 @@ class _LoginPageState extends State<LoginPage> {
             await _auth.signOut();
           }
         } else {
-          // User exists in Auth but not in Firestore (legacy user or partial registration)
-          if (mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const Choice(registrationData: {})),
-              (Route<dynamic> route) => false,
-            );
+          // Fallback to Firestore if Web API returns null (e.g., legacy user or API error)
+          // Or show error? Better to fallback for now to be safe, or just show error.
+          // User requested "change way", implying replacement.
+          // But to avoid blocking if API fails, I'll log and maybe try Firestore as backup,
+          // or just assume pending if not found?
+          // Let's fallback to Firestore to be safe during transition.
+
+          print("User not found in Web API, checking Firestore...");
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+          if (doc.exists) {
+            final approvalStatus = doc.data()?['approvalStatus'] ?? 'pending';
+            final String? serviceType = doc.data()?['serviceType'];
+            final bool isProvider = doc.data()?['isProvider'] ??
+                (serviceType == 'Provider' || serviceType == 'Both');
+            final bool isSeeker = doc.data()?['isSeeker'] ??
+                (serviceType == 'Seeker' || serviceType == 'Both');
+
+            // ... duplicate logic or simple redirect
+            if (approvalStatus == 'approved') {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => isProvider
+                          ? const Homepage()
+                          : const ServicesHomeScreen()),
+                );
+              }
+            } else if (approvalStatus == 'pending') {
+              if (mounted) {
+                Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => ApprovalWaitingPage()));
+              }
+            } else {
+              showErrorDialog(
+                  "Account Rejected", "Your account has been rejected.");
+              await _auth.signOut();
+            }
+          } else {
+            // User really not found
+            if (mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const Choice(registrationData: {})),
+                (Route<dynamic> route) => false,
+              );
+            }
           }
         }
       }
@@ -365,11 +430,24 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         TextField(
                           controller: passwordController,
-                          obscureText: true,
+                          obscureText: _isObscured,
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             prefixIcon:
                                 const Icon(Icons.lock, color: Colors.indigo),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isObscured
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: Colors.indigo,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isObscured = !_isObscured;
+                                });
+                              },
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
                                 vertical: 20, horizontal: 20),
                             hintText: '********',

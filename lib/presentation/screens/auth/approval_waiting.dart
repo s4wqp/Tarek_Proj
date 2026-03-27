@@ -4,7 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
+import 'package:tarek_proj/presentation/screens/home/ServicesHomeScreen.dart';
+import 'package:tarek_proj/presentation/screens/home/service_router.dart';
+import 'package:tarek_proj/data/web_services/web_services.dart';
 import 'Login.dart';
+import 'rejected_screen.dart';
 
 class ApprovalWaitingPage extends StatefulWidget {
   final Widget? targetScreen;
@@ -53,50 +57,73 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
         });
       }
 
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .get();
+      // Check status from Web API
+      final userData = await WebServices().getUserByEmail(user!.email!);
 
-      if (doc.exists) {
-        final status = doc.data()?['approvalStatus'] ?? 'pending';
+      if (userData != null) {
+        final int status = userData['statu'] ?? 1; // 1: pending
+        String newStatus = 'pending';
+        if (status == 2) {
+          newStatus = 'approved';
+        } else if (status == 3) {
+          newStatus = 'rejected';
+        }
+
+        final int typeId = userData['u_type_id'] ?? 1;
+        final int catId = userData['cat_id'] ?? 0;
+
         setState(() {
-          approvalStatus = status;
+          approvalStatus = newStatus;
           isLoading = false;
         });
 
-        if (status == 'approved') {
+        if (newStatus == 'approved') {
           if (isEmailVerified) {
-            _navigateToHome();
-          } else {
-            // Stay here, UI will show email verification
+            if (widget.targetScreen == null) {
+              // Route based on cat_id
+              final bool isProvider = (typeId == 2 || typeId == 3);
+              final Widget dashboard = catId > 0
+                  ? getServiceDashboard(catId, isProvider: isProvider)
+                  : (isProvider
+                      ? const Homepage()
+                      : const ServicesHomeScreen());
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => dashboard),
+              );
+            } else {
+              _navigateToHome();
+            }
           }
-        } else if (status == 'rejected') {
-          _showRejectionDialog();
+        } else if (newStatus == 'rejected') {
+          _navigateToRejectedScreen();
         }
       } else {
-        // User document does not exist, create it now
-        try {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .set({
-            'email': user.email,
-            'uid': user.uid,
-            'approvalStatus': 'pending', // pending, approved, rejected
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+        // Fallback to Firestore if Web API fails/returns null
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-          // After creating, set status to pending and stop loading
+        if (doc.exists) {
+          final status = doc.data()?['approvalStatus'] ?? 'pending';
           setState(() {
-            approvalStatus = 'pending';
+            approvalStatus = status;
             isLoading = false;
           });
-        } catch (e) {
-          print("Error creating user document: $e");
-          // Handle error appropriately, maybe show a dialog or retry
+
+          if (status == 'approved') {
+            if (isEmailVerified) {
+              _navigateToHome();
+            }
+          } else if (status == 'rejected') {
+            _navigateToRejectedScreen();
+          }
+        } else {
+          // User doc doesn't exist in Firestore either.
+          // Just set pending and wait (maybe API isn't synced yet)
           setState(() {
+            approvalStatus = 'pending';
             isLoading = false;
           });
         }
@@ -156,18 +183,11 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
     );
   }
 
-  void _showRejectionDialog() {
-    AwesomeDialog(
-      context: context,
-      dialogType: DialogType.error,
-      animType: AnimType.rightSlide,
-      title: "Registration Rejected",
-      desc:
-          "Your registration has been rejected. Please contact support for more information.",
-      btnOkOnPress: () {
-        _logout();
-      },
-    ).show();
+  void _navigateToRejectedScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const RejectedScreen()),
+    );
   }
 
   Future<void> _logout() async {
@@ -193,6 +213,8 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
         ],
       ),
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage("images/bg.jpg"),

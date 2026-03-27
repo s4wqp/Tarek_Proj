@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tarek_proj/presentation/screens/services/BothServices.dart';
 import 'package:tarek_proj/presentation/screens/services/provide_services.dart';
-import 'package:tarek_proj/presentation/screens/services/provide_services3.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 class Choice extends StatefulWidget {
@@ -101,15 +101,10 @@ class _ChoiceState extends State<Choice> {
       );
     } else if (selectedOptions.contains("Looking for a service")) {
       widget.registrationData['serviceType'] = 'Seeker';
-      // Seekers skip vehicle/service-cat steps and go to Address (Step 3)
-      // Actually they go to ProvideServices3?
-      // Previous summary said: "Set serviceType to 'Seeker' and navigate directly to ProvideServices3 (Address)"
-      // But ProvideServices3 usually takes them to ProvideServices4...
-      // Let's verify ProvideServices3 logic later if needed, but for now replicate the "Seeker -> ProvideServices3" logic.
       Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => ProvideServices3(
+            builder: (context) => ProvideServices(
                   registrationData: widget.registrationData,
                 )),
       );
@@ -149,76 +144,86 @@ class _ChoiceState extends State<Choice> {
         ),
         width: double.infinity,
         height: double.infinity,
-        child: Column(
-          children: [
-            const SizedBox(height: 100),
-            Container(
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.only(left: 20),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Awesome!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 32,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(left: 20),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Awesome!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 32,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    "We're so close",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 18,
+                    SizedBox(height: 10),
+                    Text(
+                      "We're so close",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 18,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 80),
-            const Text(
-              "Step 2 : Select what you need.",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 40),
+              const Text(
+                "Step 2 : Select what you need.",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 30),
-            const Text(
-              "You want to:\n Note: You can select both",
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                buildCircleButton("Provide a service", Icons.add_card),
-                const SizedBox(width: 50),
-                buildCircleButton("Looking for a service", Icons.search),
-              ],
-            ),
-            const SizedBox(height: 60),
-            ElevatedButton(
-              onPressed:
-                  selectedOptions.isNotEmpty ? navigateToSelectedPages : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: selectedOptions.isNotEmpty
-                    ? Colors.blueGrey[700]
-                    : Colors.grey[800],
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30)),
-              ),
-              child: const Text(
-                "Next",
+              const SizedBox(height: 30),
+              const Text(
+                "You want to:\n Note: You can select both",
                 style: TextStyle(color: Colors.white, fontSize: 16),
               ),
-            ),
-          ],
+              const SizedBox(height: 30),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                        child: buildCircleButton(
+                            "Provide a service", Icons.add_card)),
+                    const SizedBox(width: 20),
+                    Expanded(
+                        child: buildCircleButton(
+                            "Looking for a service", Icons.search)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+              ElevatedButton(
+                onPressed:
+                    selectedOptions.isNotEmpty ? navigateToSelectedPages : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: selectedOptions.isNotEmpty
+                      ? Colors.blueGrey[700]
+                      : Colors.grey[800],
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
+                ),
+                child: const Text(
+                  "Next",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
