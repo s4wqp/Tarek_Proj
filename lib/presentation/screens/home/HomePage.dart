@@ -153,7 +153,7 @@ class HomeContent extends StatelessWidget {
             ListTile(
                 leading: ElevatedButton(
                   style: ButtonStyle(
-                      backgroundColor: MaterialStateProperty.all(Colors.blue)),
+                      backgroundColor: WidgetStateProperty.all(Colors.blue)),
                   onPressed: () {},
                   child: const Text(
                     'Start ride',
@@ -166,7 +166,7 @@ class HomeContent extends StatelessWidget {
                 trailing: ElevatedButton(
                   style: ButtonStyle(
                       backgroundColor:
-                          MaterialStateProperty.all(const Color(0xff2d3142))),
+                          WidgetStateProperty.all(const Color(0xff2d3142))),
                   onPressed: () {},
                   child: const Text(
                     'View ride history',

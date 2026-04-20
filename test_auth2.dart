@@ -13,14 +13,14 @@ void main() async {
     Response loginResp = await dio.post('auth/login',
         data: {"user_name": "admin", "user_password": "123456"});
 
-    print("Status: " + loginResp.statusCode.toString());
-    print("Data: " + loginResp.data.toString());
+    print("Status: ${loginResp.statusCode}");
+    print("Data: ${loginResp.data}");
   } catch (e) {
     if (e is DioException) {
-      print("Error Status: " + (e.response?.statusCode.toString() ?? "null"));
-      print("Error Data: " + (e.response?.data.toString() ?? "null"));
+      print("Error Status: ${e.response?.statusCode.toString() ?? "null"}");
+      print("Error Data: ${e.response?.data.toString() ?? "null"}");
     } else {
-      print("Error: " + e.toString());
+      print("Error: $e");
     }
   }
 }

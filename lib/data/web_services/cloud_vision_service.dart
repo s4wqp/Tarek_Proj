@@ -17,8 +17,9 @@ class CloudVisionService {
 
   /// Detects text from an image file using OCR.space API.
   /// Tries Engine 1 with Arabic, then Engine 2 as fallback.
+  /// [isTable] can improve structured cards (e.g. licenses).
   Future<String?> detectText(File imageFile,
-      {int engine = 1, String language = 'ara'}) async {
+      {int engine = 1, String language = 'ara', bool isTable = false}) async {
     try {
       File fileToUpload = imageFile;
 
@@ -60,6 +61,10 @@ class CloudVisionService {
         'scale': 'true',
         'OCREngine': '$engine',
       };
+
+      if (isTable) {
+        formFields['isTable'] = 'true';
+      }
 
       // Engine 1 supports language param; Engine 2 auto-detects
       if (engine == 1) {

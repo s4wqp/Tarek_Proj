@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
-import 'package:tarek_proj/data/web_services/gemini_vision_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:tarek_proj/data/web_services/web_services.dart';
@@ -11,6 +10,7 @@ import 'package:tarek_proj/data/web_services/cloud_vision_service.dart';
 import 'package:tarek_proj/presentation/screens/auth/approval_waiting.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProvideServices4 extends StatefulWidget {
   final Map<String, dynamic> registrationData;
@@ -37,8 +37,8 @@ class _ProvideServices4State extends State<ProvideServices4> {
   bool _isSubmitting = false;
 
   // Persistent OCR digit storage across both front and back scans
-  List<String> _frontDigitFragments = [];
-  List<String> _backDigitFragments = [];
+  final List<String> _frontDigitFragments = [];
+  final List<String> _backDigitFragments = [];
 
   @override
   void dispose() {
@@ -102,61 +102,7 @@ class _ProvideServices4State extends State<ProvideServices4> {
           personalIdCardBack = image;
         }
       });
-      // OCR ONLY runs when BACK card is uploaded — never on front upload alone
-      if (imageType == 'ID_Back') {
-        // Clear previous fragments for a fresh combined scan
-        _frontDigitFragments.clear();
-        _backDigitFragments.clear();
-
-        // Scan front image first SILENTLY (no dialog)
-        if (personalIdCardFront != null) {
-          await _scanText(personalIdCardFront!,
-              isFront: true, showResultDialog: false);
-        }
-        // Then scan back image WITH dialog (this will also trigger the fallback chain)
-        await _scanText(image, isFront: false, showResultDialog: true);
-
-        // === PASS 4 (MULTI-IMAGE): Gemini Vision AI ===
-        // We run this ONLY at the very end when BOTH images are available
-        if (personalIdCardFront != null) {
-          // Check if local OCR failed to find complete 14 digits
-          // If the field isn't 14 digits long, local failed. Let's fire AI.
-          if (idNumberController.text.length != 14) {
-            try {
-              print("=== OCR Pass 4 (Gemini Vision AI: MULTI-IMAGE) ===");
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text("Cloud AI analyzing both card sides..."),
-                  duration: Duration(seconds: 4),
-                  backgroundColor: Colors.blue,
-                ));
-              }
-
-              final geminiVision = GeminiVisionService();
-              String? geminiResult = await geminiVision
-                  .extractNationalId([personalIdCardFront!, image]);
-              print("Gemini Multi-Image Result: $geminiResult");
-
-              if (geminiResult != null && geminiResult.length == 14) {
-                if (mounted) {
-                  setState(() {
-                    extractedIDNumber = geminiResult;
-                    idNumberController.text = geminiResult;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text("ID Number verified by AI: $geminiResult"),
-                    duration: const Duration(seconds: 4),
-                    backgroundColor: Colors.green,
-                  ));
-                }
-              }
-            } catch (e) {
-              print("Gemini Multi-Image Error: $e");
-            }
-          }
-        }
-      }
+      // Removed OCR trigger for ID cards as requested (Cards depend on country).
     }
   }
 
@@ -488,8 +434,9 @@ class _ProvideServices4State extends State<ProvideServices4> {
             for (int i = 0; i < clean.length; i++) {
               if (clean[i] == '2' || clean[i] == '3') {
                 String candidate = clean.substring(i);
-                if (candidate.length > 14)
+                if (candidate.length > 14) {
                   candidate = candidate.substring(0, 14);
+                }
                 if (candidate.length >= 5 &&
                     (bestPartial == null ||
                         candidate.length > bestPartial.length)) {
@@ -704,7 +651,7 @@ class _ProvideServices4State extends State<ProvideServices4> {
         'statu': 1, // 1 bending - 2 approval - 3 reject
 
         // Address Info
-        'country': 'Egypt',
+        'country': regData['country'] ?? 'Egypt',
         'state': regData['city'],
         // 'city': regData['city'], // Removed as per new JSON which only has 'state', 'district' etc. Wait, JSON has 'state' and 'district', but no 'city' key in JSON example. It has 'state'.
         // Actually JSON has: country, state, district, zip_code, street_name, Building_number, Floor_number, Apartment_number, Lead_mark
@@ -723,8 +670,8 @@ class _ProvideServices4State extends State<ProvideServices4> {
             ? regData['special_marque'].toString().substring(0, 40)
             : regData['special_marque'],
 
-        // user_name defaults to email per DB spec
-        'user_name': regData['email'],
+        // user_name uses the collected username (fallback to email if somehow missing)
+        'user_name': regData['username'] ?? regData['email'],
 
         // Missing fields from JSON
         'user_helth_note': null,
@@ -838,6 +785,21 @@ class _ProvideServices4State extends State<ProvideServices4> {
 
           // 4. Navigate
           if (mounted) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('user_email', regData['email'].toString());
+            if ((regData['country'] ?? '').toString().trim().isNotEmpty) {
+              await prefs.setString(
+                  'user_country', regData['country'].toString().trim());
+            }
+            if ((regData['city'] ?? '').toString().trim().isNotEmpty) {
+              await prefs.setString(
+                  'user_city', regData['city'].toString().trim());
+            }
+            if ((regData['district'] ?? '').toString().trim().isNotEmpty) {
+              await prefs.setString(
+                  'user_district', regData['district'].toString().trim());
+            }
+
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             }
@@ -872,7 +834,16 @@ class _ProvideServices4State extends State<ProvideServices4> {
                 "Server Error ${e.response?.statusCode}: $dataString";
           }
         } else {
-          errorMessage = e.message ?? "Unknown error";
+          final String str = (e.message ?? "").toLowerCase();
+          if (str.contains('network') ||
+              str.contains('socketexception') ||
+              str.contains('failed host lookup') ||
+              str.contains('timeout')) {
+            errorMessage =
+                "Please check your internet connection and try again.";
+          } else {
+            errorMessage = "A network error occurred. Please try again later.";
+          }
         }
         print("Registration Error Details: ${e.response?.data}");
 
@@ -885,8 +856,17 @@ class _ProvideServices4State extends State<ProvideServices4> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
+        String errorMsg =
+            "An unexpected error occurred. Please try again later.";
+        final String str = e.toString().toLowerCase();
+        if (str.contains('network') ||
+            str.contains('socketexception') ||
+            str.contains('failed host lookup') ||
+            str.contains('timeout')) {
+          errorMsg = "Please check your internet connection and try again.";
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(errorMsg)),
         );
       }
     }

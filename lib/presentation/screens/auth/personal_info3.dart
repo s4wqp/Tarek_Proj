@@ -1,9 +1,11 @@
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:tarek_proj/presentation/screens/auth/personal_info4.dart';
 
 class PersonalInfo3 extends StatefulWidget {
   final String email;
+  final String username;
   final String password;
   final String firstName;
   final String lastName;
@@ -13,6 +15,7 @@ class PersonalInfo3 extends StatefulWidget {
   const PersonalInfo3({
     super.key,
     required this.email,
+    required this.username,
     required this.password,
     required this.firstName,
     required this.lastName,
@@ -29,6 +32,9 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
   final TextEditingController whatsappController = TextEditingController();
   final TextEditingController birthDateController = TextEditingController();
 
+  String completePhoneNumber = '';
+  String completeWhatsappNumber = '';
+
   void showErrorDialog(String title, String message) {
     AwesomeDialog(
       context: context,
@@ -40,11 +46,11 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
     ).show();
   }
 
-  bool isValidPhoneNumber(String phone) {
-    // Starts with 01, followed by exactly 9 digits. Total 11 digits.
-    final RegExp phoneRegex = RegExp(r'^01[0-9]{9}$');
-    return phoneRegex.hasMatch(phone);
+  bool _isValidPhoneNumber(String phone) {
+    return phone.length >= 8 && phone.startsWith('+');
   }
+
+  // Removed manual validation since IntlPhoneField handles it
 
   void pickBirthDate() async {
     DateTime? pickedDate = await showDatePicker(
@@ -63,17 +69,23 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
   }
 
   void handleNext() {
-    String phone = phoneController.text.trim();
-    String whatsapp = whatsappController.text.trim();
     String birthDate = birthDateController.text.trim();
 
-    if (phone.isEmpty || birthDate.isEmpty) {
-      showErrorDialog("Error", "Please fill in all fields.");
+    if (completePhoneNumber.isEmpty || birthDate.isEmpty) {
+      showErrorDialog("Error", "Please fill in all required fields.");
       return;
     }
 
-    if (!isValidPhoneNumber(phone)) {
-      showErrorDialog("Invalid Phone", "Please enter a valid phone number.");
+    if (!_isValidPhoneNumber(completePhoneNumber)) {
+      showErrorDialog("Invalid Phone",
+          "Please enter a valid phone number with country code.");
+      return;
+    }
+
+    if (completeWhatsappNumber.isNotEmpty &&
+        !_isValidPhoneNumber(completeWhatsappNumber)) {
+      showErrorDialog("Invalid WhatsApp",
+          "Please enter a valid WhatsApp number with country code.");
       return;
     }
 
@@ -82,13 +94,16 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
       MaterialPageRoute(
         builder: (context) => PersonalInfo4(
           email: widget.email,
+          username: widget.username,
           password: widget.password,
           firstName: widget.firstName,
           lastName: widget.lastName,
           arabicName: widget.arabicName,
           jobTitle: widget.jobTitle,
-          phone: phone,
-          whatsapp: whatsapp.isEmpty ? phone : whatsapp,
+          phone: completePhoneNumber,
+          whatsapp: completeWhatsappNumber.isEmpty
+              ? completePhoneNumber
+              : completeWhatsappNumber,
           birthDate: birthDate,
         ),
       ),
@@ -143,20 +158,22 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
                     ),
                   ),
                 ),
-                TextField(
+                IntlPhoneField(
                   controller: phoneController,
-                  keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.phone, color: Colors.indigo),
                     contentPadding: const EdgeInsets.symmetric(
                         vertical: 20, horizontal: 20),
-                    hintText: '01234567890',
+                    hintText: 'Phone Number',
                     hintStyle: const TextStyle(color: Colors.black),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15)),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.8),
                   ),
+                  initialCountryCode: 'EG',
+                  onChanged: (phone) {
+                    completePhoneNumber = phone.completeNumber;
+                  },
                 ),
                 const SizedBox(height: 20),
                 const Align(
@@ -172,21 +189,22 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
                     ),
                   ),
                 ),
-                TextField(
+                IntlPhoneField(
                   controller: whatsappController,
-                  keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    prefixIcon:
-                        const Icon(Icons.mark_chat_unread, color: Colors.green),
                     contentPadding: const EdgeInsets.symmetric(
                         vertical: 20, horizontal: 20),
-                    hintText: '01234567890 (Optional if same)',
+                    hintText: 'WhatsApp (Optional if same)',
                     hintStyle: const TextStyle(color: Colors.black54),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15)),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.8),
                   ),
+                  initialCountryCode: 'EG',
+                  onChanged: (phone) {
+                    completeWhatsappNumber = phone.completeNumber;
+                  },
                 ),
                 const SizedBox(height: 40),
                 const Align(

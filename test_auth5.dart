@@ -22,8 +22,8 @@ void main() async {
     try {
       Response loginResp = await dio.post('auth/login', data: p);
       if (loginResp.statusCode == 200) {
-        print("SUCCESS PAYLOAD: " + p.toString());
-        print("TOKEN: " + loginResp.data.toString());
+        print("SUCCESS PAYLOAD: $p");
+        print("TOKEN: ${loginResp.data}");
         return;
       }
     } catch (e) {

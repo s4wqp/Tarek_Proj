@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'SignUp.dart';
@@ -12,6 +10,8 @@ import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
 import 'package:tarek_proj/presentation/screens/home/ServicesHomeScreen.dart';
 import 'package:tarek_proj/presentation/screens/home/service_router.dart';
 import 'package:tarek_proj/data/web_services/web_services.dart';
+import 'package:tarek_proj/presentation/screens/admin/AdminDashboardScreen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,7 +29,6 @@ class _LoginPageState extends State<LoginPage> {
 
   int currentIndex = 0;
   Timer? _timer;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -53,14 +52,13 @@ class _LoginPageState extends State<LoginPage> {
       if (fetchedSponsors.isNotEmpty) {
         if (mounted) {
           // Filter to ensure elements are Maps and allow dynamic keys
-          final validSponsors =
-              fetchedSponsors.where((element) => element is Map).toList();
+          final validSponsors = fetchedSponsors.whereType<Map>().toList();
 
           if (validSponsors.isNotEmpty) {
             final List<Map<String, dynamic>> mappedSponsors = [];
 
             for (var data in validSponsors) {
-              final mapData = data as Map;
+              final mapData = data;
               final String webSiteUrl = mapData['sponsor_web_site'] ?? '';
               final Set<String> uniqueUrls = {};
 
@@ -86,7 +84,12 @@ class _LoginPageState extends State<LoginPage> {
                   if (imageUrl.startsWith('/')) {
                     imageUrl = imageUrl.substring(1);
                   }
-                  // Prepend base URL
+                  // Fix backend discrepancy: new images miss "public/" prefix
+                  if (!imageUrl.startsWith('public/')) {
+                    imageUrl = "public/$imageUrl";
+                  }
+
+                  // Prepend base URL with HTTPS wrapper
                   imageUrl = "https://api.aidme.online/$imageUrl";
                 }
 
@@ -134,156 +137,147 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> handleLogin() async {
-    String email = emailController.text.trim();
+    String inputEmailOrUsername = emailController.text.trim();
     String password = passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (inputEmailOrUsername.isEmpty || password.isEmpty) {
       showErrorDialog("Error", "Please fill in all fields.");
       return;
     }
 
+    String emailToLoginWith = inputEmailOrUsername;
+
+    // Local development admin shortcut:
+    // allow entering admin dashboard even when admin user is not yet in backend.
+    if (inputEmailOrUsername.toLowerCase() == 'admin@gmail.com' &&
+        password == 'admin12345') {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_email', 'admin@gmail.com');
+      await prefs.setString('user_token', 'local-admin-dev-token');
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      }
+      return;
+    }
+
+    // Check if the user typed a username (no '@' symbol)
+    if (!inputEmailOrUsername.contains('@')) {
+      // Show loading if possible, or just wait
+      final userData =
+          await WebServices().getUserByUsername(inputEmailOrUsername);
+      if (userData != null && userData['email'] != null) {
+        emailToLoginWith = userData['email'];
+      } else if (userData != null && userData['user_email'] != null) {
+        emailToLoginWith = userData['user_email'];
+      } else {
+        showErrorDialog("Login Failed",
+            "Username not found in the database. Please check your spelling.");
+        return;
+      }
+    }
+
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+      // Primary Login via Backend API (and get token)
+      final String? token =
+          await WebServices().loginUserForToken(inputEmailOrUsername, password);
+
+      if (token == null || token.isEmpty) {
+        showErrorDialog("Login Failed", "Incorrect email or password.");
+        return;
+      }
+
+      // Save session via SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_token', token);
+      await prefs.setString('user_email', emailToLoginWith);
+      await WebServices().backfillUserLocationIfMissing(
+        email: emailToLoginWith,
+        country: (prefs.getString('user_country') ?? ''),
+        city: (prefs.getString('user_city') ?? ''),
+        district: (prefs.getString('user_district') ?? ''),
       );
 
-      User? user = userCredential.user;
-      if (user != null) {
-        // Admin bypass — skip API/Firestore checks
-        if (email == 'admin@gmail.com') {
+      // Admin bypass
+      if (emailToLoginWith == 'admin@gmail.com') {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const AdminDashboardScreen()),
+          );
+        }
+        return;
+      }
+
+      // Check approval status from Web API
+      final userData = await WebServices().getUserByEmail(emailToLoginWith);
+
+      if (userData != null) {
+        final int status = userData['statu'] ?? 1; // 1: pending
+        final int typeId = userData['u_type_id'] ?? 1; // 1: Seeker
+        final int catId = userData['cat_id'] ?? 0;
+
+        // Map status
+        String approvalStatus = 'pending';
+        if (status == 2) {
+          approvalStatus = 'approved';
+        } else if (status == 3) {
+          approvalStatus = 'rejected';
+        }
+
+        // Map type: 1=Seeker, 2=Provider, 3=Both
+        final bool isProvider = (typeId == 2 || typeId == 3);
+
+        // Get the service-specific dashboard
+        final Widget dashboard = catId > 0
+            ? getServiceDashboard(catId, isProvider: isProvider)
+            : (isProvider ? const Homepage() : const ServicesHomeScreen());
+
+        if (approvalStatus == 'approved') {
           if (mounted) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const Homepage()),
+              MaterialPageRoute(builder: (context) => dashboard),
             );
           }
-          return;
+        } else if (approvalStatus == 'pending') {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      ApprovalWaitingPage(targetScreen: dashboard)),
+            );
+          }
+        } else if (approvalStatus == 'rejected') {
+          showErrorDialog("Account Rejected",
+              "Your account has been rejected. Please contact support.");
+          await prefs.remove('user_email');
         }
-
-        // Check approval status
-        // Check approval status from Web API
-        final userData = await WebServices().getUserByEmail(email);
-
-        if (userData != null) {
-          final int status = userData['statu'] ?? 1; // 1: pending
-          final int typeId = userData['u_type_id'] ?? 1; // 1: Seeker
-          final int catId = userData['cat_id'] ?? 0;
-
-          // Map status
-          String approvalStatus = 'pending';
-          if (status == 2) {
-            approvalStatus = 'approved';
-          } else if (status == 3) {
-            approvalStatus = 'rejected';
-          }
-
-          // Map type: 1=Seeker, 2=Provider, 3=Both
-          final bool isProvider = (typeId == 2 || typeId == 3);
-
-          // Get the service-specific dashboard
-          final Widget dashboard = catId > 0
-              ? getServiceDashboard(catId, isProvider: isProvider)
-              : (isProvider ? const Homepage() : const ServicesHomeScreen());
-
-          if (approvalStatus == 'approved') {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => dashboard),
-              );
-            }
-          } else if (approvalStatus == 'pending') {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        ApprovalWaitingPage(targetScreen: dashboard)),
-              );
-            }
-          } else if (approvalStatus == 'rejected') {
-            showErrorDialog("Account Rejected",
-                "Your account has been rejected. Please contact support.");
-            await _auth.signOut();
-          }
-        } else {
-          // Fallback to Firestore if Web API returns null (e.g., legacy user or API error)
-          // Or show error? Better to fallback for now to be safe, or just show error.
-          // User requested "change way", implying replacement.
-          // But to avoid blocking if API fails, I'll log and maybe try Firestore as backup,
-          // or just assume pending if not found?
-          // Let's fallback to Firestore to be safe during transition.
-
-          print("User not found in Web API, checking Firestore...");
-          final doc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-
-          if (doc.exists) {
-            final approvalStatus = doc.data()?['approvalStatus'] ?? 'pending';
-            final String? serviceType = doc.data()?['serviceType'];
-            final bool isProvider = doc.data()?['isProvider'] ??
-                (serviceType == 'Provider' || serviceType == 'Both');
-            final bool isSeeker = doc.data()?['isSeeker'] ??
-                (serviceType == 'Seeker' || serviceType == 'Both');
-
-            // ... duplicate logic or simple redirect
-            if (approvalStatus == 'approved') {
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => isProvider
-                          ? const Homepage()
-                          : const ServicesHomeScreen()),
-                );
-              }
-            } else if (approvalStatus == 'pending') {
-              if (mounted) {
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => ApprovalWaitingPage()));
-              }
-            } else {
-              showErrorDialog(
-                  "Account Rejected", "Your account has been rejected.");
-              await _auth.signOut();
-            }
-          } else {
-            // User really not found
-            if (mounted) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const Choice(registrationData: {})),
-                (Route<dynamic> route) => false,
-              );
-            }
-          }
+      } else {
+        // User not found in API - redirect to choice
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const Choice(registrationData: {})),
+            (Route<dynamic> route) => false,
+          );
         }
       }
-    } on FirebaseAuthException catch (e) {
-      // More specific error messages
-      String errorMsg = "An error occurred. Please try again.";
-      if (e.code == 'user-not-found') {
-        errorMsg = "No user found for that email.";
-      } else if (e.code == 'wrong-password') {
-        errorMsg = "Wrong password provided for that user.";
-      } else if (e.code == 'invalid-email') {
-        errorMsg = "The email address is not valid.";
-      } else if (e.code == 'user-disabled') {
-        errorMsg = "This user has been disabled.";
-      } else if (e.code == 'too-many-requests') {
-        errorMsg = "Too many requests. Try again later.";
-      } else if (e.message != null) {
-        errorMsg = e.message!;
-      }
-      showErrorDialog("Login Failed", errorMsg);
     } catch (e) {
-      showErrorDialog("Login Failed", "An unexpected error occurred.");
+      String errorMsg = "An unexpected error occurred. Please try again later.";
+      final String str = e.toString().toLowerCase();
+      if (str.contains('network') ||
+          str.contains('socketexception') ||
+          str.contains('failed host lookup') ||
+          str.contains('timeout')) {
+        errorMsg = "Please check your internet connection and try again.";
+      }
+      showErrorDialog("Error", errorMsg);
     }
   }
 
@@ -389,7 +383,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: Padding(
                             padding: EdgeInsets.only(left: 5, bottom: 5),
                             child: Text(
-                              'Email',
+                              'Email or Username',
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -400,14 +394,17 @@ class _LoginPageState extends State<LoginPage> {
                         TextField(
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
-                          autofillHints: const [AutofillHints.email],
+                          autofillHints: const [
+                            AutofillHints.email,
+                            AutofillHints.username
+                          ],
                           decoration: InputDecoration(
                             prefixIcon:
-                                const Icon(Icons.email, color: Colors.indigo),
+                                const Icon(Icons.person, color: Colors.indigo),
                             contentPadding: const EdgeInsets.symmetric(
                                 vertical: 20, horizontal: 20),
-                            hintText: 'name@gmail.com',
-                            hintStyle: const TextStyle(color: Colors.black),
+                            hintText: 'name@gmail.com or username',
+                            hintStyle: const TextStyle(color: Colors.black54),
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(15)),
                             filled: true,

@@ -18,14 +18,14 @@ void main() async {
   ];
 
   for (var p in payloads) {
-    print("\\n--- Testing payload: " + p.toString());
+    print("\\n--- Testing payload: $p");
     try {
       Response loginResp = await dio.post('auth/login', data: p);
-      print("Status: " + loginResp.statusCode.toString());
-      print("Data: " + loginResp.data.toString());
+      print("Status: ${loginResp.statusCode}");
+      print("Data: ${loginResp.data}");
     } catch (e) {
       if (e is DioException) {
-        print("Error: " + (e.response?.data.toString() ?? "null"));
+        print("Error: ${e.response?.data.toString() ?? "null"}");
       }
     }
   }

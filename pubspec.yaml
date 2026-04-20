@@ -48,7 +48,6 @@ dependencies:
   geocoding:
   image_picker:
   google_mlkit_text_recognition:
-  image_extensions:
   permission_handler:
   email_otp:
   alert_dialog:
@@ -56,7 +55,11 @@ dependencies:
   faker: ^2.1.0
   supabase_flutter:
   flutter_image_compress: ^2.4.0
+  image: ^4.3.0
   google_mlkit_barcode_scanning: ^0.14.2
+  flutter_map: ^5.0.0
+  latlong2: ^0.9.1
+  intl_phone_field: ^3.2.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

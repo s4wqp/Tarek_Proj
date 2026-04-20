@@ -1,0 +1,12 @@
+Testing Payload 1
+Status: 400
+{"error":"Schedule with start_date and trip_time is required"}
+----------------------------------------
+Testing Payload 2
+Status: 200
+{"success":true,"trip_id":9,"total_distance":"10.47"}
+----------------------------------------
+Testing Payload 3
+Status: 400
+{"error":"Schedule with start_date and trip_time is required"}
+----------------------------------------

@@ -1,0 +1,1 @@
+[{"stop_order":1,"stop_id":1,"distance":null,"stop_name":"10 عباس العقاد","latitude":"30.0510000","longitude":"31.3650000","street_name":"Abbas El-Akad","district":"Nasr City"},{"stop_order":2,"stop_id":2,"distance":"5.82","stop_name":"2A El-Khalifa Mamoun","latitude":"30.0910000","longitude":"31.3260000","street_name":"Khalifa Mamoun","district":"Heliopolis"}]

@@ -7,11 +7,11 @@ void main() async {
   try {
     Response loginResp = await dio
         .post('auth/login', data: {"user_name": "admin", "password": "123456"});
-    print("Status: " + loginResp.statusCode.toString());
-    print("Token: " + loginResp.data.toString());
+    print("Status: ${loginResp.statusCode}");
+    print("Token: ${loginResp.data}");
   } catch (e) {
     if (e is DioException) {
-      print("Error: " + (e.response?.data.toString() ?? "null"));
+      print("Error: ${e.response?.data.toString() ?? "null"}");
     }
   }
 }

@@ -1,0 +1,186 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "stop_name": "10 \u0639\u0628\u0627\u0633 \u0627\u0644\u0639\u0642\u0627\u062f",
+      "latitude": "30.0510000",
+      "longitude": "31.3650000",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Nasr City",
+      "zip_code": "12090",
+      "street_name": "Abbas El-Akad"
+    },
+    {
+      "id": 4,
+      "stop_name": "16 90 st.",
+      "latitude": "30.0280000",
+      "longitude": "31.4060000",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "New Cairo",
+      "zip_code": "12093",
+      "street_name": "90 street"
+    },
+    {
+      "id": 2,
+      "stop_name": "2A El-Khalifa Mamoun",
+      "latitude": "30.0910000",
+      "longitude": "31.3260000",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Heliopolis",
+      "zip_code": "12091",
+      "street_name": "Khalifa Mamoun"
+    },
+    {
+      "id": 3,
+      "stop_name": "55 st.7",
+      "latitude": "29.9600000",
+      "longitude": "31.2580000",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Maadi",
+      "zip_code": "12092",
+      "street_name": "street 7"
+    },
+    {
+      "id": 15,
+      "stop_name": "Al Nozha Street",
+      "latitude": "30.0301833",
+      "longitude": "31.0218101",
+      "country": "Egypt",
+      "state": "Giza",
+      "district": "Belleville",
+      "zip_code": "12593",
+      "street_name": "Al Nozha Street"
+    },
+    {
+      "id": 13,
+      "stop_name": "Al Set Wasila Alley",
+      "latitude": "30.0445304",
+      "longitude": "31.2633489",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Cairo",
+      "zip_code": "11675",
+      "street_name": "Al Set Wasila Alley"
+    },
+    {
+      "id": 11,
+      "stop_name": "Emad Al Din Street",
+      "latitude": "30.0566250",
+      "longitude": "31.2442508",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Cairo",
+      "zip_code": "11669",
+      "street_name": "Emad Al Din Street"
+    },
+    {
+      "id": 10,
+      "stop_name": "Hyper One, Al Nozha Street, Neighborhood 3, District 1, Belleville, Giza, 12593, Egypt",
+      "latitude": "30.0302544",
+      "longitude": "31.0211783",
+      "country": "Egypt",
+      "state": "Giza",
+      "district": "Belleville",
+      "zip_code": "12593",
+      "street_name": "Al Nozha Street"
+    },
+    {
+      "id": 8,
+      "stop_name": "madinaty",
+      "latitude": "30.0885241",
+      "longitude": "31.6350983",
+      "country": "",
+      "state": "",
+      "district": "",
+      "zip_code": "",
+      "street_name": ""
+    },
+    {
+      "id": 16,
+      "stop_name": "Masr W Al Sudan Street",
+      "latitude": "30.0802941",
+      "longitude": "31.2800225",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Cairo",
+      "zip_code": "11646",
+      "street_name": "Masr W Al Sudan Street"
+    },
+    {
+      "id": 14,
+      "stop_name": "Park St W",
+      "latitude": "30.0526000",
+      "longitude": "30.9825000",
+      "country": "Egypt",
+      "state": "Giza",
+      "district": "Zayed",
+      "zip_code": "",
+      "street_name": "El-Bostan Street"
+    },
+    {
+      "id": 5,
+      "stop_name": "Ramses",
+      "latitude": "39.5613681",
+      "longitude": "-0.2866759",
+      "country": "Spain",
+      "state": "Valencian Community",
+      "district": "la Pobla de Farnals",
+      "zip_code": "",
+      "street_name": ""
+    },
+    {
+      "id": 9,
+      "stop_name": "Sherif Pasha Street",
+      "latitude": "30.0521526",
+      "longitude": "31.2424468",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Cairo",
+      "zip_code": "11513",
+      "street_name": "Sherif Pasha Street"
+    },
+    {
+      "id": 12,
+      "stop_name": "Talaea Al Iman Street",
+      "latitude": "29.9801147",
+      "longitude": "31.2486402",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Maddi",
+      "zip_code": "11716",
+      "street_name": "Talaea Al Iman Street"
+    },
+    {
+      "id": 6,
+      "stop_name": "Warren Street",
+      "latitude": "40.7147225",
+      "longitude": "-74.0084878",
+      "country": "United States",
+      "state": "New York",
+      "district": "New York",
+      "zip_code": "10007",
+      "street_name": "Warren Street"
+    },
+    {
+      "id": 7,
+      "stop_name": "\u0645\u0637\u0639\u0645 \u0639\u0645\u064a \u0628\u0634\u0646\u062f\u064a, Al Bank Street, Saudi Buildings, Nasr City, Cairo, 11391, Egypt",
+      "latitude": "30.0765581",
+      "longitude": "31.3414052",
+      "country": "Egypt",
+      "state": "Cairo",
+      "district": "Nasr City",
+      "zip_code": "11391",
+      "street_name": "Al Bank Street"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 16,
+    "totalPages": 1
+  }
+}

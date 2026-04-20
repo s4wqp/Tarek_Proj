@@ -1,0 +1,44 @@
+﻿
+============================================================
+  TESTING: https://api.aidme.online/api
+============================================================
+  Γ¥î List sponsors (GET /sponsors) ΓåÆ 404
+  Γ¥î Get sponsor #1 (GET /sponsors/1) ΓåÆ 404
+  Γ¥î Search sponsors (GET /sponsors/search?q=test&field=sponsor_name) ΓåÆ 404
+  Γ¥î List stops (GET /stops) ΓåÆ 401
+  Γ¥î Get stop #1 (GET /stops/1) ΓåÆ 401
+  Γ¥î Search stops (GET /stops/search/cairo) ΓåÆ 401
+  Γ¥î Distinct locations (GET /stops/locations/distinct) ΓåÆ 401
+  Γ¥î Stop coordinates #1 (GET /stops/coordinates/1) ΓåÆ 404
+
+  AUTH: Got token = YES (eyJhbGciOi...)
+  Γ£à My trips (GET /trips/my) ΓåÆ 200 | List[0]
+  Γ£à Upcoming trips (GET /trips/upcoming) ΓåÆ 200 | Map{trips, upcoming_count}
+  Γ£à Trip stats (GET /trips/stats/summary) ΓåÆ 200 | Map{total_trips, active_trips, inactive_trips, total_seats_offered, avg_price}
+  Γ£à Get trip #1 (GET /trips/1) ΓåÆ 200 | Map{id, user_id, cat_id, trip_title, start_stop_id}
+  Γ¥î Trip #1 schedule (GET /trips/1/schedule) ΓåÆ 404
+  Γ£à Trip #1 route (GET /trips/1/route) ΓåÆ 200 | List[0]
+
+============================================================
+  TESTING: http://161.35.51.188:5001/api
+============================================================
+  Γ¥î List sponsors (GET /sponsors) ΓåÆ 404
+  Γ¥î Get sponsor #1 (GET /sponsors/1) ΓåÆ 404
+  Γ¥î Search sponsors (GET /sponsors/search?q=test&field=sponsor_name) ΓåÆ 404
+  Γ¥î List stops (GET /stops) ΓåÆ 401
+  Γ¥î Get stop #1 (GET /stops/1) ΓåÆ 401
+  Γ¥î Search stops (GET /stops/search/cairo) ΓåÆ 401
+  Γ¥î Distinct locations (GET /stops/locations/distinct) ΓåÆ 401
+  Γ¥î Stop coordinates #1 (GET /stops/coordinates/1) ΓåÆ 404
+
+  AUTH: Got token = YES (eyJhbGciOi...)
+  Γ£à My trips (GET /trips/my) ΓåÆ 200 | List[0]
+  Γ£à Upcoming trips (GET /trips/upcoming) ΓåÆ 200 | Map{trips, upcoming_count}
+  Γ£à Trip stats (GET /trips/stats/summary) ΓåÆ 200 | Map{total_trips, active_trips, inactive_trips, total_seats_offered, avg_price}
+  Γ£à Get trip #1 (GET /trips/1) ΓåÆ 200 | Map{id, user_id, cat_id, trip_title, start_stop_id}
+  Γ¥î Trip #1 schedule (GET /trips/1/schedule) ΓåÆ 404
+  Γ£à Trip #1 route (GET /trips/1/route) ΓåÆ 200 | List[0]
+
+============================================================
+  ALL TESTS COMPLETE
+============================================================

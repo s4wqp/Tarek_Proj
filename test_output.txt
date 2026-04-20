@@ -1,0 +1,49 @@
+﻿========================================
+  SPONSORS API ENDPOINT TESTS
+========================================
+
+1) GET /api/sponsors (List All)
+   ERROR: DioException [bad response]: This exception was thrown because the response has a status code of 404 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 404 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+
+2) GET /api/sponsors/1 (Get By ID)
+   ERROR: DioException [bad response]: This exception was thrown because the response has a status code of 404 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 404 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+
+3) POST /api/sponsors (Create - text only)
+   ERROR: DioException [bad response]: This exception was thrown because the response has a status code of 404 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 404 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+
+4) PUT /api/sponsors/1 (Update)
+   ERROR: DioException [bad response]: This exception was thrown because the response has a status code of 404 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 404 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+
+5) DELETE /api/sponsors/9999 (Delete - safe high ID)
+   ERROR: DioException [bad response]: This exception was thrown because the response has a status code of 404 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 404 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+
+6) GET /api/sponsors/search?q=test&field=sponsor_name (Search)
+   ERROR: DioException [bad response]: This exception was thrown because the response has a status code of 404 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 404 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+
+========================================
+  TESTS COMPLETE
+========================================

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
 import 'package:tarek_proj/presentation/screens/home/ServicesHomeScreen.dart';
@@ -42,23 +41,23 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
 
   Future<void> _checkApprovalStatus() async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString('user_email');
+
+      if (email == null || email.isEmpty) {
         _navigateToLogin();
         return;
       }
 
-      await user.reload();
-      user = FirebaseAuth.instance.currentUser; // Refresh user object
-
       if (mounted) {
         setState(() {
-          isEmailVerified = user?.emailVerified ?? false;
+          isEmailVerified =
+              true; // Assume true since we are removing Firebase Auth
         });
       }
 
       // Check status from Web API
-      final userData = await WebServices().getUserByEmail(user!.email!);
+      final userData = await WebServices().getUserByEmail(email);
 
       if (userData != null) {
         final int status = userData['statu'] ?? 1; // 1: pending
@@ -99,34 +98,11 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
           _navigateToRejectedScreen();
         }
       } else {
-        // Fallback to Firestore if Web API fails/returns null
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (doc.exists) {
-          final status = doc.data()?['approvalStatus'] ?? 'pending';
-          setState(() {
-            approvalStatus = status;
-            isLoading = false;
-          });
-
-          if (status == 'approved') {
-            if (isEmailVerified) {
-              _navigateToHome();
-            }
-          } else if (status == 'rejected') {
-            _navigateToRejectedScreen();
-          }
-        } else {
-          // User doc doesn't exist in Firestore either.
-          // Just set pending and wait (maybe API isn't synced yet)
-          setState(() {
-            approvalStatus = 'pending';
-            isLoading = false;
-          });
-        }
+        // Fallback or user not found in backend
+        setState(() {
+          approvalStatus = 'pending';
+          isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -139,32 +115,17 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
   }
 
   Future<void> _resendVerificationEmail() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && !user.emailVerified) {
-      try {
-        await user.sendEmailVerification();
-        if (mounted) {
-          AwesomeDialog(
-            context: context,
-            dialogType: DialogType.success,
-            animType: AnimType.rightSlide,
-            title: 'Email Sent',
-            desc: 'Verification email has been sent to ${user.email}',
-            btnOkOnPress: () {},
-          ).show();
-        }
-      } catch (e) {
-        if (mounted) {
-          AwesomeDialog(
-            context: context,
-            dialogType: DialogType.error,
-            animType: AnimType.rightSlide,
-            title: 'Error',
-            desc: 'Failed to send verification email. Please try again later.',
-            btnOkOnPress: () {},
-          ).show();
-        }
-      }
+    // Firebase verification removed.
+    if (mounted) {
+      AwesomeDialog(
+        context: context,
+        dialogType: DialogType.info,
+        animType: AnimType.rightSlide,
+        title: 'Info',
+        desc:
+            'Email verification is currently disabled or managed by the backend.',
+        btnOkOnPress: () {},
+      ).show();
     }
   }
 
@@ -192,7 +153,8 @@ class _ApprovalWaitingPageState extends State<ApprovalWaitingPage> {
 
   Future<void> _logout() async {
     try {
-      await FirebaseAuth.instance.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_email');
       _navigateToLogin();
     } catch (e) {
       print('Error logging out: $e');

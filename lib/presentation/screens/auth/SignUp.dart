@@ -14,16 +14,19 @@ class SignUpPage extends StatefulWidget {
 
 class _SignUpPageState extends State<SignUpPage> {
   TextEditingController emailController = TextEditingController();
+  TextEditingController usernameController = TextEditingController();
   TextEditingController passController = TextEditingController();
   TextEditingController repassController = TextEditingController();
   bool _obscureTextPass = true;
   bool _obscureTextRePass = true;
   String? _emailErrorText;
+  String? _usernameErrorText;
   bool _isLoading = false;
 
   @override
   void dispose() {
     emailController.dispose();
+    usernameController.dispose();
     passController.dispose();
     repassController.dispose();
     super.dispose();
@@ -54,15 +57,25 @@ class _SignUpPageState extends State<SignUpPage> {
   Future<void> handleSignUp() async {
     setState(() {
       _emailErrorText = null;
+      _usernameErrorText = null;
     });
 
     String email = emailController.text.trim();
+    String username = usernameController.text.trim();
     String password = passController.text.trim();
     String repassword = repassController.text.trim();
 
     if (email.isEmpty) {
       setState(() {
         _emailErrorText = "Please enter an email address";
+      });
+      return;
+    }
+
+    if (username.isEmpty || username.length < 3 || username.contains(' ')) {
+      setState(() {
+        _usernameErrorText =
+            "Please enter a valid username (min 3 chars, no spaces)";
       });
       return;
     }
@@ -136,6 +149,16 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
+      final existingUsername = await WebServices().getUserByUsername(username);
+      if (existingUsername != null) {
+        setState(() {
+          _usernameErrorText =
+              "This username is already taken. Please try another.";
+          _isLoading = false;
+        });
+        return;
+      }
+
       // 4. Email is available, proceed to next step
       if (mounted) {
         setState(() {
@@ -144,18 +167,20 @@ class _SignUpPageState extends State<SignUpPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) =>
-                  PersonalInfo2(email: email, password: password)),
+              builder: (context) => PersonalInfo2(
+                  email: email, username: username, password: password)),
         );
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage = "An error occurred. Please try again.";
       if (e.code == 'invalid-email') {
-        setState(() {
-          _emailErrorText = "Invalid email format.";
-          _isLoading = false;
-        });
-        return;
+        errorMessage = "Invalid email format.";
+      } else if (e.code == 'email-already-in-use') {
+        errorMessage = "This email is already registered.";
+      } else if (e.code == 'network-request-failed') {
+        errorMessage = "Please check your internet connection and try again.";
+      } else {
+        errorMessage = "Registration failed. Please try again.";
       }
       setState(() {
         _isLoading = false;
@@ -165,7 +190,15 @@ class _SignUpPageState extends State<SignUpPage> {
       setState(() {
         _isLoading = false;
       });
-      showErrorDialog("Error", e.toString());
+      String errorMsg = "An unexpected error occurred. Please try again later.";
+      final String str = e.toString().toLowerCase();
+      if (str.contains('network') ||
+          str.contains('socketexception') ||
+          str.contains('failed host lookup') ||
+          str.contains('timeout')) {
+        errorMsg = "Please check your internet connection and try again.";
+      }
+      showErrorDialog("Error", errorMsg);
     }
   }
 
@@ -199,7 +232,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    "Step 1: Enter Email & Set Password",
+                    "Step 1: Enter Email, Username & Set Password",
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                   const SizedBox(height: 40),
@@ -227,7 +260,32 @@ class _SignUpPageState extends State<SignUpPage> {
                       fillColor: Colors.white.withOpacity(0.8),
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: usernameController,
+                    onChanged: (value) {
+                      if (_usernameErrorText != null) {
+                        setState(() {
+                          _usernameErrorText = null;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      prefixIcon:
+                          const Icon(Icons.person, color: Colors.indigo),
+                      hintText: 'Username',
+                      errorText: _usernameErrorText,
+                      errorStyle: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15)),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: passController,
                     obscureText: _obscureTextPass,

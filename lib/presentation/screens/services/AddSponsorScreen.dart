@@ -25,6 +25,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
   final TextEditingController _placeWhatsappPhoneController =
       TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _websiteController = TextEditingController();
 
   // Detailed Address Controllers
   final TextEditingController _countryController = TextEditingController();
@@ -80,6 +81,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
       _placePhoneController.text = '011${getRandomNumber(8)}';
       _placeWhatsappPhoneController.text = '012${getRandomNumber(8)}';
       _emailController.text = 'test${getRandomNumber(3)}@test.com';
+      _websiteController.text = 'https://example${getRandomNumber(2)}.com';
 
       _selectedCategory = _categories[random.nextInt(_categories.length)];
 
@@ -106,6 +108,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
     _placePhoneController.dispose();
     _placeWhatsappPhoneController.dispose();
     _emailController.dispose();
+    _websiteController.dispose();
 
     _countryController.dispose();
     _cityController.dispose();
@@ -119,7 +122,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
     super.dispose();
   }
 
-  Future<void> _checkLocationPermission() async {
+  Future<bool> _checkLocationPermission() async {
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -130,7 +133,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
           const SnackBar(content: Text('Location services are disabled.')),
         );
       }
-      return;
+      return false;
     }
 
     permission = await Geolocator.checkPermission();
@@ -142,7 +145,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
             const SnackBar(content: Text('Location permissions are denied')),
           );
         }
-        return;
+        return false;
       }
     }
 
@@ -154,12 +157,15 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
                   'Location permissions are permanently denied, we cannot request permissions.')),
         );
       }
-      return;
+      return false;
     }
+
+    return true;
   }
 
   Future<void> _getCurrentLocation() async {
-    await _checkLocationPermission();
+    bool hasPermission = await _checkLocationPermission();
+    if (!hasPermission) return;
 
     setState(() {
       _isLoadingLocation = true;
@@ -171,8 +177,10 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
 
       // 2. If not available, get current position with timeout and optimized accuracy
       position ??= await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 30),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 30),
+        ),
       );
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -277,7 +285,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
       try {
         final Map<String, dynamic> apiData = {
           "firm_id": 1,
-          "sponsor_cat": _selectedCategory,
+          "sponsor_cat": _selectedCategory ?? 'Other',
           "sponsor_name": _nameController.text,
           "Mangaer_name": _managerNameController.text,
           "country": _countryController.text,
@@ -289,14 +297,16 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
           "floor_number": _floorController.text,
           "Unit_number": _aptController.text,
           "Lead_mark": _markController.text,
-          "Unit_latitude": _latitude,
-          "Unit_lONGITUDE": _longitude,
+          "Unit_latitude": _latitude ?? 0.0,
+          "Unit_lONGITUDE": _longitude ?? 0.0,
           "sponsor_email": _emailController.text,
-          "sponsor_web_site": null,
+          "sponsor_web_site":
+              _websiteController.text.isNotEmpty ? _websiteController.text : '',
           "sponsor_tel_no": _placePhoneController.text,
           "sponsor_whatsapp_no": _placeWhatsappPhoneController.text,
           "statu": 1,
-          "sponsor_Reg_no": null
+          "sponsor_Reg_no":
+              0 // Requirement from API, hardcoded since not in form
         };
 
         final response = await WebServices().addSponsor(apiData, _images);
@@ -345,6 +355,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
           'place_phone': _placePhoneController.text,
           'place_whatsapp_phone': _placePhoneController.text,
           'email': _emailController.text,
+          'website': _websiteController.text,
 
           'business_category': _selectedCategory,
           // Detailed Address
@@ -452,6 +463,12 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
               ),
               const SizedBox(height: 15),
               _buildTextField(
+                controller: _websiteController,
+                label: "Website (Optional)",
+                icon: Icons.language,
+              ),
+              const SizedBox(height: 15),
+              _buildTextField(
                 controller: _managerPhoneController,
                 label: "Manager Phone",
                 icon: Icons.phone,
@@ -475,7 +492,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
 
               // Category Dropdown
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: InputDecoration(
                   labelText: "Business Category",
                   labelStyle: const TextStyle(color: Colors.white70),
@@ -663,7 +680,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
                         ),
                       ],
                     );
-                  }).toList(),
+                  }),
                   if (_images.length < 3)
                     GestureDetector(
                       onTap: _pickImage,

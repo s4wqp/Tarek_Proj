@@ -105,24 +105,16 @@ class _ProvideServicesState extends State<ProvideServices> {
                         setState(() {
                           if (option == "Other") {
                             isOtherSelected = !isOtherSelected;
-                            if (!isOtherSelected) {
+                            if (isOtherSelected) {
+                              selectedServices.clear();
+                            } else {
                               otherServiceController.clear();
-                              selectedServices.removeWhere((service) =>
-                                  currentOptions.contains(service));
                             }
                           } else {
-                            if (!isProvider) {
-                              // Seeker - Single selection? Let's assume single for easier matching
-                              selectedServices.clear();
-                              selectedServices.add(option);
-                            } else {
-                              // Provider - Multi selection allowed (or single based on requirements, let's allow multi for UI but backend might take first)
-                              if (isSelected) {
-                                selectedServices.remove(option);
-                              } else {
-                                selectedServices.add(option);
-                              }
-                            }
+                            selectedServices.clear();
+                            selectedServices.add(option);
+                            isOtherSelected = false;
+                            otherServiceController.clear();
                           }
                         });
                       },

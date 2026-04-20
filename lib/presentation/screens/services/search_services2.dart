@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:faker/faker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';

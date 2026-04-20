@@ -1,11 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:tarek_proj/presentation/screens/services/provide_services3.dart';
-import 'package:tarek_proj/data/web_services/cloud_vision_service.dart';
 
 class ProvideServices2 extends StatefulWidget {
   final Map<String, dynamic> registrationData;
@@ -85,22 +82,6 @@ class _ProvideServices2State extends State<ProvideServices2> {
     super.dispose();
   }
 
-  /// Converts Arabic/Eastern Arabic numeral characters to Western digits
-  String _convertArabicNumerals(String text) {
-    StringBuffer result = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      int code = text.codeUnitAt(i);
-      if (code >= 0x0660 && code <= 0x0669) {
-        result.write(code - 0x0660);
-      } else if (code >= 0x06F0 && code <= 0x06F9) {
-        result.write(code - 0x06F0);
-      } else {
-        result.write(text[i]);
-      }
-    }
-    return result.toString();
-  }
-
   Future<void> _pickDate() async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
@@ -161,176 +142,6 @@ class _ProvideServices2State extends State<ProvideServices2> {
         carPhoto = file;
       }
     });
-
-    if (type == 'carPhoto') return; // Don't scan car photos for text
-
-    // Process OCR
-    try {
-      String? ocrText;
-
-      // Pass 1: Latin recognizer
-      final inputImage = InputImage.fromFile(file);
-      final textRecognizer =
-          TextRecognizer(script: TextRecognitionScript.latin);
-      final RecognizedText recognizedText =
-          await textRecognizer.processImage(inputImage);
-      ocrText = recognizedText.text;
-      textRecognizer.close();
-
-      // Normalize Arabic numerals using Unicode codepoint ranges
-      String fullText = _convertArabicNumerals(ocrText);
-      print("Normalized Text for $type License (Pass 1): $fullText");
-
-      _extractAndFillData(fullText, type);
-
-      // Pass 2: If fields are still empty, try default recognizer
-      bool needsRetry =
-          (type == 'user' && userLicenseController.text.isEmpty) ||
-              (type == 'car' && carLicenseController.text.isEmpty);
-
-      if (needsRetry) {
-        try {
-          final inputImage2 = InputImage.fromFile(file);
-          final textRecognizer2 = TextRecognizer();
-          final RecognizedText recognizedText2 =
-              await textRecognizer2.processImage(inputImage2);
-
-          String fullText2 = _convertArabicNumerals(recognizedText2.text);
-          print("Normalized Text for $type License (Pass 2): $fullText2");
-          _extractAndFillData(fullText2, type);
-          textRecognizer2.close();
-        } catch (e) {
-          print("OCR Pass 2 Error: $e");
-        }
-      }
-
-      // Pass 3: Cloud Vision API (supports Arabic numerals)
-      bool stillNeedsRetry =
-          (type == 'user' && userLicenseController.text.isEmpty) ||
-              (type == 'car' && carLicenseController.text.isEmpty);
-
-      if (stillNeedsRetry) {
-        try {
-          print("OCR Pass 3: Trying Cloud Vision for $type license...");
-          final cloudVision = CloudVisionService();
-          String? cloudText = await cloudVision.detectText(file);
-          if (cloudText != null) {
-            String convertedText = _convertArabicNumerals(cloudText);
-            print("Cloud Vision text for $type: $convertedText");
-            _extractAndFillData(convertedText, type);
-          }
-        } catch (e) {
-          print("OCR Pass 3 (Cloud Vision) Error: $e");
-        }
-      }
-    } catch (e) {
-      print("OCR Error: $e");
-    }
-  }
-
-  void _extractAndFillData(String text, String type) {
-    // Clean text: remove non-alphanumeric characters except spaces/newlines to simplify processing?
-    // Actually, getting raw text is better.
-
-    if (type == 'user') {
-      // User License/ID Card logic
-      // target: 14 digit National ID
-
-      // Strategy: Find all sequences of digits, potentially separated by spaces
-      // normalization removed spaces? No.
-
-      // Remove all non-digit characters to check for a continuous stream of 14 digits?
-      // No, that might merge different numbers (e.g. date + id).
-
-      // Regex to find 10-20 digits allow dashes and spaces
-      // e.g. 1234 5678 9012 34 OR 123456789-005
-      final idRegex = RegExp(r'\d[\s\d-]{9,20}\d');
-      final matches = idRegex.allMatches(text);
-
-      String? bestCandidate;
-
-      for (final match in matches) {
-        String raw = match.group(0)!;
-        String digitsOnly =
-            raw.replaceAll(RegExp(r'\D'), ''); // Remove spaces/symbols
-
-        if (digitsOnly.length >= 10 && digitsOnly.length <= 16) {
-          // Prefer 14 digits (Egypt)
-          // But accept 10+ (USA driver's license often 9-12)
-          if (digitsOnly.length == 14) {
-            bestCandidate = digitsOnly;
-          } else if (bestCandidate == null ||
-              (bestCandidate.length != 14 &&
-                  digitsOnly.length > bestCandidate.length)) {
-            // Keep longest candidate if we don't have a 14-digit one
-            bestCandidate = digitsOnly;
-          }
-        }
-      }
-
-      if (bestCandidate != null) {
-        setState(() {
-          userLicenseController.text = bestCandidate!;
-        });
-      }
-    } else if (type == 'car') {
-      // Car License Logic
-      // Target: 3-4 digit number (Standard Egyptian Plate)
-      // Text might be: "س ب ر 1234" or "1 2 3 4"
-
-      // Find all numbers in the text, allowing for spaces in between digits
-      // e.g. "1 2 3 4" or "1234"
-      // Regex: digit followed by optional space/hyphen then another digit
-      final regex = RegExp(r'\d[\d\s-]*\d');
-      final matches = regex.allMatches(text);
-
-      String? bestCandidate;
-      String? shortCandidate;
-      String? longCandidate;
-
-      for (final match in matches) {
-        String num = match.group(0)!;
-        String cleanNum = num.replaceAll(
-            RegExp(r'[\s-]+'), ''); // remove all spaces and hyphens
-
-        int len = cleanNum.length;
-
-        // Check for Plate Number (3-4)
-        if (len >= 3 && len <= 4) {
-          int val = int.tryParse(cleanNum) ?? 0;
-          // Filter out likely years
-          if (len == 4 && (val >= 1900 && val <= 2100)) {
-            continue;
-          }
-          if (shortCandidate == null) shortCandidate = cleanNum;
-        }
-
-        // Check for Long ID/License/Chassis (10-14+)
-        if (len >= 10) {
-          // Likely a license number (National ID is 14)
-          if (longCandidate == null || len > longCandidate.length) {
-            longCandidate = cleanNum;
-          }
-        }
-      }
-
-      // Priority: If user uploaded a driver's license (14 digits) to Car License field, use it if no short number found?
-      // Or prioritize long number if present?
-      // Since user complained about 14 digit number not showing, let's prefer it if found.
-      bestCandidate = longCandidate ?? shortCandidate;
-
-      if (bestCandidate != null) {
-        setState(() {
-          carLicenseController.text = bestCandidate!;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              "Could not detect license number. If using Arabic numerals, please enter manually."),
-          duration: Duration(seconds: 4),
-        ));
-      }
-    }
   }
 
   @override
@@ -501,7 +312,7 @@ class _ProvideServices2State extends State<ProvideServices2> {
                         const SizedBox(height: 20),
                         _buildGlassTextField(
                           controller: vehicleNameController,
-                          label: '${selectedTransportation} Name/Brand',
+                          label: '$selectedTransportation Name/Brand',
                           icon: Icons.directions_car_rounded,
                         ),
                         const SizedBox(height: 16),
@@ -517,7 +328,7 @@ class _ProvideServices2State extends State<ProvideServices2> {
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: selectedCarModelYear,
-                              hint: Text('Select Model Year',
+                              hint: const Text('Select Model Year',
                                   style: TextStyle(color: Colors.white54)),
                               dropdownColor: const Color(0xFF1E1E1E),
                               icon: const Icon(
@@ -550,6 +361,26 @@ class _ProvideServices2State extends State<ProvideServices2> {
                           label: 'Plate No.',
                           icon: Icons.pin_rounded,
                         ),
+                        const SizedBox(height: 16),
+                        _buildGlassTextField(
+                          controller: carLicenseController,
+                          label: 'Vehicle License No.',
+                          icon: Icons.badge_rounded,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassTextField(
+                          controller: carLicenseEndDateController,
+                          label: 'License Expiry',
+                          icon: Icons.event_rounded,
+                          readOnly: true,
+                          onTap: _pickDate,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassTextField(
+                          controller: userLicenseController,
+                          label: 'Driver License No.',
+                          icon: Icons.subtitles_rounded,
+                        ),
                         const SizedBox(height: 24),
 
                         _buildSectionHeader(
@@ -572,27 +403,6 @@ class _ProvideServices2State extends State<ProvideServices2> {
                         _buildImageUploadCard(
                             'Vehicle Photo', 'carPhoto', carPhoto,
                             fullWidth: true),
-
-                        const SizedBox(height: 24),
-                        _buildGlassTextField(
-                          controller: carLicenseController,
-                          label: 'Vehicle License No.',
-                          icon: Icons.badge_rounded,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildGlassTextField(
-                          controller: carLicenseEndDateController,
-                          label: 'License Expiry',
-                          icon: Icons.event_rounded,
-                          readOnly: true,
-                          onTap: _pickDate,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildGlassTextField(
-                          controller: userLicenseController,
-                          label: 'Driver License No.',
-                          icon: Icons.subtitles_rounded,
-                        ),
                       ],
                     ),
                   ),
@@ -880,7 +690,7 @@ class _ProvideServices2State extends State<ProvideServices2> {
                           color: Colors.white54,
                           size: 32),
                       const SizedBox(height: 8),
-                      Text("Tap to upload",
+                      const Text("Tap to upload",
                           style:
                               TextStyle(color: Colors.white54, fontSize: 12)),
                     ],

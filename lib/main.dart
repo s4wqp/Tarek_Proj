@@ -1,13 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:tarek_proj/presentation/screens/auth/Login.dart';
+import 'package:tarek_proj/presentation/screens/auth/auth_wrapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:tarek_proj/presentation/screens/home/Choice.dart';
-import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
-import 'package:tarek_proj/presentation/screens/services/provide_services.dart';
-
-import 'package:tarek_proj/presentation/screens/services/provide_services2.dart';
-import 'package:tarek_proj/presentation/screens/services/provide_services4.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,18 +9,14 @@ void main() async {
   try {
     // Check if Firebase is already initialized
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        name: 'Tarek-Proj',
-        options: FirebaseOptions(
-          apiKey: "AIzaSyAkNposTrjqFsT7zog5xXI1fk-mgvQ9vzM",
-          appId: '1:847973994383:android:a72c205d18d4fe240605fa',
-          messagingSenderId: "847973994383",
-          projectId: "tarek-fd908",
-        ),
-      );
+      // Use native platform config:
+      // - Android: `android/app/google-services.json`
+      // - iOS: `ios/Runner/GoogleService-Info.plist`
+      await Firebase.initializeApp();
     }
     await SupabaseService.initialize();
-    runApp(MyApp());
+    final initialHome = await resolveInitialHome();
+    runApp(MyApp(initialHome: initialHome));
   } catch (e) {
     print("Firebase Initialization Error: $e");
   }
@@ -45,13 +35,14 @@ class SupabaseService {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  final Widget initialHome;
+  const MyApp({super.key, required this.initialHome});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: LoginPage(),
+      home: initialHome,
     );
   }
 }

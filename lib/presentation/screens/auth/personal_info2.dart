@@ -6,9 +6,14 @@ import 'SignUp.dart';
 
 class PersonalInfo2 extends StatefulWidget {
   final String email;
+  final String username;
   final String password;
 
-  const PersonalInfo2({super.key, required this.email, required this.password});
+  const PersonalInfo2(
+      {super.key,
+      required this.email,
+      required this.username,
+      required this.password});
 
   @override
   _PersonalInfo2State createState() => _PersonalInfo2State();
@@ -93,6 +98,7 @@ class _PersonalInfo2State extends State<PersonalInfo2> {
       MaterialPageRoute(
         builder: (context) => PersonalInfo3(
           email: widget.email,
+          username: widget.username,
           password: widget.password,
           firstName: firstName,
           lastName: lastName,

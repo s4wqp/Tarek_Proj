@@ -1,15 +1,8 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:tarek_proj/presentation/screens/auth/Login.dart';
-import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
 import 'package:tarek_proj/presentation/screens/services/search_services2.dart';
-
 import 'package:tarek_proj/presentation/screens/auth/approval_waiting.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:tarek_proj/presentation/screens/home/ServicesHomeScreen.dart';
-import 'package:tarek_proj/presentation/screens/home/Choice.dart';
 
 class Searchservice extends StatefulWidget {
   const Searchservice({super.key});
@@ -251,48 +244,17 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   /// Check if the user'controller email is verified
   Future<void> checkEmailVerification() async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      await user?.reload(); // Refresh user data
+      // Firebase verification removed.
+      setState(() => isEmailVerified = true);
+      checkEmailTimer?.cancel();
 
-      if (user != null && user.emailVerified) {
-        setState(() => isEmailVerified = true);
-        checkEmailTimer?.cancel(); // Stop checking when verified
-
-        // Fetch user role to determine target screen
-        Widget targetScreen = const Homepage(); // Default
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-          if (doc.exists) {
-            final isSeeker = doc.data()?['isSeeker'] ?? false;
-            // Provider is default, but check if only seeker?
-            // Logic: If Provider -> Homepage. If Seeker AND NOT Provider -> ServicesHomeScreen.
-            // Or just follow Login logic:
-            final isProvider = doc.data()?['isProvider'] ?? false;
-
-            if (isProvider) {
-              targetScreen = const Homepage();
-            } else if (isSeeker) {
-              targetScreen = const ServicesHomeScreen();
-            } else {
-              targetScreen = const Choice(registrationData: {});
-            }
-          }
-        } catch (e) {
-          print("Error fetching user role: $e");
-        }
-
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-                builder: (context) =>
-                    ApprovalWaitingPage(targetScreen: targetScreen)),
-            (route) => false,
-          );
-        }
+      // Bypass directly to ApprovalWaitingPage to fetch status from Web API
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const ApprovalWaitingPage()),
+          (route) => false,
+        );
       }
     } catch (e) {
       print("Error checking email verification: $e");
@@ -301,37 +263,11 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
 
   /// Resend the verification email with a timer
   Future<void> resendVerificationEmail() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      await user?.sendEmailVerification();
-
-      setState(() {
-        canResendEmail = false;
-        countdown = 60; // Reset countdown
-      });
-
-      // Start the countdown timer
-      resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() {
-          if (countdown > 0) {
-            countdown--;
-          } else {
-            canResendEmail = true;
-            timer.cancel();
-          }
-        });
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Verification email sent! Check your inbox.')),
-      );
-    } catch (e) {
-      print("Error sending email: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to send email. Try again later.')),
-      );
-    }
+    // Firebase verification removed
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Email verification is managed by the backend.')),
+    );
   }
 
   @override
@@ -369,7 +305,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                   : "Please wait before resending.",
               style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
-            SizedBox(
+            const SizedBox(
               height: 60,
             ),
             MaterialButton(
@@ -381,8 +317,10 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                 padding: const EdgeInsets.only(
                     left: 50, right: 50, top: 10, bottom: 10),
                 onPressed: () {
-                  Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (context) => LoginPage()));
+                  Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LoginPage()));
                 },
                 child: const Text(
                   'return to Login Screen',

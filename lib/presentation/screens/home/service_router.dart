@@ -8,12 +8,18 @@ import 'package:tarek_proj/presentation/screens/home/dashboards/nursing_dashboar
 import 'package:tarek_proj/presentation/screens/home/dashboards/cleaning_dashboard.dart';
 import 'package:tarek_proj/presentation/screens/home/dashboards/teacher_dashboard.dart';
 import 'package:tarek_proj/presentation/screens/home/dashboards/rental_dashboard.dart';
+import 'package:tarek_proj/presentation/screens/admin/AdminDashboardScreen.dart';
 
 /// Routes to the correct dashboard based on the user's service category ID.
-/// [catId] - The category code (101-109 for seekers, 201-209 for providers)
+/// [catId] - The category code (101-109 for seekers, 201-209 for providers,
+///           901-902 for admin/sponsor)
 /// [isProvider] - Whether the user is a provider (u_type_id == 2 or 3)
 Widget getServiceDashboard(int catId, {bool isProvider = false}) {
   switch (catId) {
+    // Admin / Sponsor management
+    case 901:
+    case 902:
+      return const AdminDashboardScreen();
     // Ride services
     case 101:
     case 201:
