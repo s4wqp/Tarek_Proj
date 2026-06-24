@@ -8,6 +8,7 @@ import 'package:tarek_proj/presentation/screens/home/dashboards/nursing_dashboar
 import 'package:tarek_proj/presentation/screens/home/dashboards/cleaning_dashboard.dart';
 import 'package:tarek_proj/presentation/screens/home/dashboards/teacher_dashboard.dart';
 import 'package:tarek_proj/presentation/screens/home/dashboards/rental_dashboard.dart';
+import 'package:tarek_proj/presentation/screens/home/dashboards/sponsor_dashboard.dart';
 import 'package:tarek_proj/presentation/screens/admin/AdminDashboardScreen.dart';
 
 /// Routes to the correct dashboard based on the user's service category ID.
@@ -16,10 +17,23 @@ import 'package:tarek_proj/presentation/screens/admin/AdminDashboardScreen.dart'
 /// [isProvider] - Whether the user is a provider (u_type_id == 2 or 3)
 Widget getServiceDashboard(int catId, {bool isProvider = false}) {
   switch (catId) {
-    // Admin / Sponsor management
+    // Admin management
     case 901:
     case 902:
       return const AdminDashboardScreen();
+      
+    // Sponsor Dashboard
+    case 801:
+    case 802:
+    case 803:
+    case 804:
+    case 805:
+    case 806:
+    case 807:
+    case 808:
+    case 809:
+      return const SponsorDashboardScreen();
+
     // Ride services
     case 101:
     case 201:
@@ -34,11 +48,11 @@ Widget getServiceDashboard(int catId, {bool isProvider = false}) {
     case 103:
     case 203:
     case 104:
+    case 204:
       return CompanionDashboard(isProvider: isProvider);
 
     // Nursing / Physical Therapy
     case 105:
-    case 204:
     case 205:
     case 106:
       return NursingDashboard(isProvider: isProvider);

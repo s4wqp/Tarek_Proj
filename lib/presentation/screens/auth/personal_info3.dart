@@ -160,6 +160,7 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
                 ),
                 IntlPhoneField(
                   controller: phoneController,
+                  style: const TextStyle(color: Colors.black),
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(
                         vertical: 20, horizontal: 20),
@@ -191,6 +192,7 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
                 ),
                 IntlPhoneField(
                   controller: whatsappController,
+                  style: const TextStyle(color: Colors.black),
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(
                         vertical: 20, horizontal: 20),
@@ -222,6 +224,7 @@ class _PersonalInfo3State extends State<PersonalInfo3> {
                 ),
                 TextField(
                   controller: birthDateController,
+                  style: const TextStyle(color: Colors.black),
                   readOnly: true,
                   onTap: pickBirthDate,
                   decoration: InputDecoration(

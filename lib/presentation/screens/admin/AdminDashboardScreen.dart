@@ -1,22 +1,94 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tarek_proj/config/app_colors.dart';
+import 'package:tarek_proj/data/web_services/web_services.dart';
 import 'package:tarek_proj/presentation/screens/auth/Login.dart';
 import 'package:tarek_proj/presentation/screens/services/AddSponsorScreen.dart';
+import 'package:tarek_proj/presentation/screens/admin/manage_users_screen.dart';
+import 'package:tarek_proj/presentation/widgets/custom_widgets.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+/// Admin Dashboard — fetches real stats from the API.
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
+
+  @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  bool _isLoading = true;
+  String _totalUsers = '—';
+  String _activeProviders = '—';
+  String _pendingApprovals = '—';
+  String _totalSponsors = '—';
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final ws = WebServices();
+
+      // Fetch sponsors count
+      List<dynamic>? sponsors;
+      try {
+        sponsors = await ws.getAllSponsors();
+      } catch (_) {}
+
+      // Fetch trip stats
+      Map<String, dynamic>? tripStats;
+      try {
+        tripStats = await ws.getTripStats();
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _totalSponsors = sponsors != null ? '${sponsors.length}' : '—';
+          if (tripStats != null) {
+            _totalUsers =
+                '${tripStats['total_trips'] ?? tripStats['totalTrips'] ?? '—'}';
+            _activeProviders =
+                '${tripStats['active_trips'] ?? tripStats['activeTrips'] ?? '—'}';
+            _pendingApprovals =
+                '${tripStats['pending_trips'] ?? tripStats['pendingTrips'] ?? '—'}';
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load stats: $e';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xff030927),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Admin Dashboard',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xff030927),
+        backgroundColor: AppColors.background,
         centerTitle: true,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _loadStats,
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
@@ -28,158 +100,136 @@ class AdminDashboardScreen extends StatelessWidget {
                   );
                 }
               } catch (e) {
-                print("Logout error: $e");
+                debugPrint("Logout error: $e");
               }
             },
           )
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Overview Analytics',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 15),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                childAspectRatio: 1.3,
-                children: [
-                  _buildStatCard(
-                      'Total Users', '1,204', Icons.people, Colors.blueAccent),
-                  _buildStatCard('Active Providers', '450', Icons.work,
-                      Colors.orangeAccent),
-                  _buildStatCard('Pending Approvals', '23',
-                      Icons.pending_actions, Colors.redAccent),
-                  _buildStatCard('Total Revenue', '\$12,500',
-                      Icons.attach_money, Colors.greenAccent),
-                ],
-              ),
-              const SizedBox(height: 35),
-              const Text(
-                'Quick Actions',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 15),
-              _buildActionCard(
-                context,
-                'Add Business Sponsor',
-                'Create and manage advertising sponsors',
-                Icons.add_business,
-                Colors.purpleAccent,
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const AddSponsorScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              _buildActionCard(
-                context,
-                'Manage Users',
-                'View, approve, or reject user registrations',
-                Icons.admin_panel_settings,
-                Colors.indigoAccent,
-                () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('User Management coming soon!')),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              _buildActionCard(
-                context,
-                'App Settings',
-                'Configure core application behaviors',
-                Icons.settings,
-                Colors.blueGrey,
-                () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('App Settings coming soon!')),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-      String title, String value, IconData icon, Color color) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xff2d3142),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
-          )
-        ],
-      ),
-      padding: const EdgeInsets.all(15),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: color, size: 28),
-              Text(
-                value,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Text(
-            title,
-            style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-                fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? const LoadingOverlay(message: 'Loading dashboard...')
+          : _error != null
+              ? EmptyState(
+                  icon: Icons.error_outline,
+                  title: 'Failed to load',
+                  subtitle: _error,
+                  actionLabel: 'Retry',
+                  onAction: _loadStats,
+                )
+              : RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: _loadStats,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Overview title
+                        const SectionHeader(title: 'Overview Analytics'),
+                        const SizedBox(height: 8),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 1.3,
+                          children: [
+                            StatCard(
+                              title: 'Total Trips',
+                              value: _totalUsers,
+                              icon: Icons.route,
+                              color: AppColors.primary,
+                            ),
+                            StatCard(
+                              title: 'Active Trips',
+                              value: _activeProviders,
+                              icon: Icons.directions_car,
+                              color: AppColors.secondary,
+                            ),
+                            StatCard(
+                              title: 'Pending Trips',
+                              value: _pendingApprovals,
+                              icon: Icons.pending_actions,
+                              color: AppColors.error,
+                            ),
+                            StatCard(
+                              title: 'Sponsors',
+                              value: _totalSponsors,
+                              icon: Icons.business,
+                              color: AppColors.success,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 30),
+                        // Quick Actions
+                        const SectionHeader(title: 'Quick Actions'),
+                        const SizedBox(height: 8),
+                        _buildActionCard(
+                          context,
+                          'Add Business Sponsor',
+                          'Create and manage advertising sponsors',
+                          Icons.add_business,
+                          Colors.purpleAccent,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      const AddSponsorScreen()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _buildActionCard(
+                          context,
+                          'Manage Users',
+                          'View, approve, or reject user registrations',
+                          Icons.admin_panel_settings,
+                          Colors.indigoAccent,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ManageUsersScreen()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _buildActionCard(
+                          context,
+                          'App Settings',
+                          'Configure core application behaviors',
+                          Icons.settings,
+                          Colors.blueGrey,
+                          () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('App Settings coming soon!')),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
     );
   }
 
   Widget _buildActionCard(BuildContext context, String title, String subtitle,
       IconData icon, Color iconColor, VoidCallback onTap) {
-    return Card(
-      color: const Color(0xff2d3142),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+    return AppCard(
+      onTap: onTap,
+      padding: EdgeInsets.zero,
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.2),
+            color: iconColor.withAlpha(50),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: iconColor, size: 24),
@@ -193,7 +243,6 @@ class AdminDashboardScreen extends StatelessWidget {
             style: const TextStyle(color: Colors.white60, fontSize: 13)),
         trailing: const Icon(Icons.arrow_forward_ios,
             color: Colors.white54, size: 16),
-        onTap: onTap,
       ),
     );
   }

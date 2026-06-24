@@ -239,7 +239,9 @@ class _RideWizardState extends State<_RideWizard> {
       if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable location services.')),
+            const SnackBar(
+                content: Text(
+                    'Please enable location services in your phone settings.')),
           );
         }
         return null;
@@ -262,22 +264,40 @@ class _RideWizardState extends State<_RideWizard> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Location permission is permanently denied.')),
+                content: Text(
+                    'Location permission is permanently denied. Please enable it in Android settings.')),
           );
         }
         return null;
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      // Show a temporary snackbar to let the user know we are searching
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Detecting location...'),
+              duration: Duration(seconds: 1)),
+        );
+      }
+
+      // Try for immediate last known position first (fastest)
+      Position? position = await Geolocator.getLastKnownPosition();
+
+      // If null, get current position with a timeout so it doesn't hang on emulators
+      position ??= await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
+
       return LatLng(position.latitude, position.longitude);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content:
-                  Text('Could not get location. Please type it manually.')),
+              content: Text(
+                  'Could not detect location automatically. Please search manually.')),
         );
       }
       return null;
@@ -970,6 +990,7 @@ class _RideWizardState extends State<_RideWizard> {
             onGps: () async {
               LatLng? loc = await _detectCurrentLocation();
               if (loc != null) {
+                if (!mounted) return;
                 setState(() {
                   startPoint.latLng = loc;
                   _startController.text =
@@ -1002,6 +1023,7 @@ class _RideWizardState extends State<_RideWizard> {
                 onGps: () async {
                   LatLng? loc = await _detectCurrentLocation();
                   if (loc != null) {
+                    if (!mounted) return;
                     setState(() {
                       restPoints[i].latLng = loc;
                       _restControllers[i].text =
@@ -1044,6 +1066,7 @@ class _RideWizardState extends State<_RideWizard> {
             onGps: () async {
               LatLng? loc = await _detectCurrentLocation();
               if (loc != null) {
+                if (!mounted) return;
                 setState(() {
                   endPoint.latLng = loc;
                   _endController.text =

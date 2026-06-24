@@ -47,16 +47,9 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
   bool _isSubmitting = false;
   bool _isLoadingLocation = false;
 
-  final List<String> _categories = [
-    'Gym',
-    'Restaurant',
-    'Therapy',
-    'Cafe',
-    'Retail',
-    'Education',
-    'Health',
-    'Other'
-  ];
+  List<Map<String, dynamic>> _categoriesData = [];
+  List<String> _categories = [];
+  bool _isLoadingCategories = true;
   String? _selectedCategory;
 
   void _fillRandomData() {
@@ -98,6 +91,65 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
       _latitude = 30.0 + random.nextDouble();
       _longitude = 31.0 + random.nextDouble();
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final data = await WebServices().getSponsorCategories();
+      if (mounted && data.isNotEmpty) {
+        final cats = data.cast<Map<String, dynamic>>();
+        setState(() {
+          _categoriesData = cats;
+          _categories = cats
+              .map((c) => c['sponsor_type']?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toList();
+          _isLoadingCategories = false;
+        });
+      } else {
+        _setFallbackCategories();
+      }
+    } catch (e) {
+      print('Failed to load categories: $e');
+      _setFallbackCategories();
+    }
+  }
+
+  void _setFallbackCategories() {
+    setState(() {
+      _categoriesData = [
+        {'cat_id': 801, 'sponsor_type': 'Restaurant'},
+        {'cat_id': 802, 'sponsor_type': 'Café'},
+        {'cat_id': 803, 'sponsor_type': 'Transport'},
+        {'cat_id': 804, 'sponsor_type': 'Company'},
+        {'cat_id': 805, 'sponsor_type': 'Medical'},
+        {'cat_id': 806, 'sponsor_type': 'Grocery'},
+        {'cat_id': 807, 'sponsor_type': 'Clothes'},
+        {'cat_id': 808, 'sponsor_type': 'Food & Sweet'},
+        {'cat_id': 809, 'sponsor_type': 'Other'},
+      ];
+      _categories = _categoriesData
+          .map((c) => c['sponsor_type']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+      _isLoadingCategories = false;
+    });
+  }
+
+  int? _getCatIdForCategory(String? categoryName) {
+    if (categoryName == null || _categoriesData.isEmpty) return null;
+    for (final cat in _categoriesData) {
+      if (cat['sponsor_type']?.toString() == categoryName) {
+        return cat['cat_id'] as int?;
+      }
+    }
+    return null;
   }
 
   @override
@@ -285,7 +337,7 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
       try {
         final Map<String, dynamic> apiData = {
           "firm_id": 1,
-          "sponsor_cat": _selectedCategory ?? 'Other',
+          "sponsor_cat": _getCatIdForCategory(_selectedCategory) ?? _selectedCategory ?? 'Other',
           "sponsor_name": _nameController.text,
           "Mangaer_name": _managerNameController.text,
           "country": _countryController.text,

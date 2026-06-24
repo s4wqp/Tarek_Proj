@@ -109,7 +109,8 @@ Future<Widget> resolveInitialHome() async {
       return const Choice(registrationData: {});
     }
 
-    await WebServices().backfillUserLocationIfMissing(
+    // Fire-and-forget: don't await, it runs in the background
+    WebServices().backfillUserLocationIfMissing(
       email: email,
       country: (prefs.getString('user_country') ?? ''),
       city: (prefs.getString('user_city') ?? ''),

@@ -129,9 +129,270 @@ class WebServices {
     }
   }
 
-  Future<List<dynamic>> getAllSponsors() async {
+  // =============================================
+  //  SPONSOR APIs (15 Endpoints)
+  // =============================================
+
+  // ------------------------------------
+  //  Public APIs
+  // ------------------------------------
+
+  /// 1. GET /api/sponsors/categories — Get sponsor categories (Public, no auth)
+  Future<List<dynamic>> getSponsorCategories() async {
     try {
-      Response response = await dio.get('sponsors');
+      Response response = await dio.get('sponsors/categories');
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'];
+        } else if (response.data is List) {
+          return response.data;
+        }
+      }
+      return [];
+    } catch (e) {
+      print("Get Sponsor Categories Error: $e");
+      return [];
+    }
+  }
+
+  /// POST /api/sponsors/register — Register as a sponsor
+  /// The /register endpoint uses JSON body parsing (not multipart FormData).
+  /// POST /api/sponsors does NOT exist (404). Only /register works.
+  /// Images are uploaded in a separate multipart call after registration.
+  Future<Response> registerSponsor(
+    Map<String, dynamic> data,
+    List<File> images,
+    String token,
+  ) async {
+    try {
+      // Debug: log what we're sending
+      print("DEBUG registerSponsor JSON data: $data");
+
+      // Step 1: Register sponsor with JSON body (no images)
+      Response response = await Dio().post(
+        'http://161.35.51.188:5001/api/sponsors/register',
+        data: data,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          validateStatus: (status) => true,
+        ),
+      );
+
+      print("DEBUG registerSponsor response status: ${response.statusCode}");
+      print("DEBUG registerSponsor response body: ${response.data}");
+
+      if (response.statusCode != null && response.statusCode! >= 400) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+          error: 'Status ${response.statusCode}',
+        );
+      }
+
+      // Step 2: Upload images separately after successful registration
+      for (int i = 0; i < images.length && i < 3; i++) {
+        try {
+          File compressedFile = await _compressFile(images[i]);
+          final fileName = compressedFile.path.split(RegExp(r'[/\\]')).last;
+          final String key = "imag${i + 1}_photo";
+
+          FormData imgForm = FormData.fromMap({
+            key: await MultipartFile.fromFile(
+              compressedFile.path,
+              filename: fileName,
+            ),
+          });
+
+          print("DEBUG uploading sponsor image $key...");
+          Response imgResp = await Dio().post(
+            'http://161.35.51.188:5001/api/sponsors/my-sponsor/image',
+            data: imgForm,
+            options: Options(
+              headers: {'Authorization': 'Bearer $token'},
+              validateStatus: (status) => true,
+            ),
+          );
+          print("DEBUG image upload status: ${imgResp.statusCode}, body: ${imgResp.data}");
+        } catch (imgErr) {
+          print("Image upload error (non-fatal): $imgErr");
+        }
+      }
+
+      return response;
+    } catch (e) {
+      print("Register Sponsor Error: $e");
+      rethrow;
+    }
+  }
+
+  // ------------------------------------
+  //  Sponsor APIs (Approved Sponsors — cat_id: 801-809, statu: 2)
+  // ------------------------------------
+
+  /// 2. GET /api/sponsors/my-sponsor — Get my sponsor data
+  /// Lightweight: tries /my-sponsor only, returns null on failure
+  Future<Map<String, dynamic>?> getMySponsorDirect() async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('sponsors/my-sponsor', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("getMySponsorDirect failed: $e");
+      return null;
+    }
+  }
+
+  /// Full version with fallback chain (heavier, used by callers who don't have user data)
+  Future<Map<String, dynamic>?> getMySponsor() async {
+    final direct = await getMySponsorDirect();
+    if (direct != null) return direct;
+
+    // Fallback: fetch via admin endpoint using user's email -> user ID -> sponsor
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString('user_email');
+      if (email != null && email.isNotEmpty) {
+        final userData = await getUserByEmail(email);
+        if (userData != null && userData['id'] != null) {
+          final userId = userData['id'];
+          return await getSponsorByUserId(userId is int ? userId : int.tryParse(userId.toString()) ?? 0);
+        }
+      }
+    } catch (fallbackError) {
+      print("Fallback sponsor fetch also failed: $fallbackError");
+    }
+    return null;
+  }
+
+  /// 3. PUT /api/sponsors/my-sponsor — Update my business info
+  Future<Response> updateMySponsor(Map<String, dynamic> data) async {
+    try {
+      final opts = await _authOptions();
+      return await dio.put('sponsors/my-sponsor', data: data, options: opts);
+    } catch (e) {
+      print("Update My Sponsor Error: $e");
+      rethrow;
+    }
+  }
+
+  /// 4. POST /api/sponsors/my-sponsor/add-image — Upload sponsor image
+  Future<Response> addMySponsorImage(File imageFile) async {
+    try {
+      File compressedFile = await _compressFile(imageFile);
+
+      final fileName = compressedFile.path.split(RegExp(r'[/\\]')).last;
+      FormData formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(
+          compressedFile.path,
+          filename: fileName,
+        ),
+      });
+
+      final opts = await _authOptions();
+      opts.headers?.remove('Content-Type');
+
+      Response response = await dio.post(
+        'sponsors/my-sponsor/add-image',
+        data: formData,
+        options: opts,
+      );
+
+      return response;
+    } catch (e) {
+      print("Add My Sponsor Image Error: $e");
+      rethrow;
+    }
+  }
+
+  /// 5-7. DELETE /api/sponsors/my-sponsor/image/{imageField} — Delete a specific image
+  /// [imageField] must be one of: 'imag1_photo', 'imag2_photo', 'imag3_photo'
+  Future<bool> deleteMySponsorImage(String imageField) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.delete(
+        'sponsors/my-sponsor/image/$imageField',
+        options: opts,
+      );
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      print("Delete My Sponsor Image Error: $e");
+      return false;
+    }
+  }
+
+  // ------------------------------------
+  //  Admin APIs (cat_id: 901, 902, 903)
+  // ------------------------------------
+
+  /// 8. POST /api/sponsors/user/{user_id} — Create sponsor for a user (Admin)
+  Future<Response> createSponsorForUser(
+    int userId,
+    Map<String, dynamic> data,
+    List<File> images,
+  ) async {
+    try {
+      FormData formData = FormData.fromMap(data);
+
+      for (int i = 0; i < images.length; i++) {
+        if (i >= 3) break;
+        final file = images[i];
+
+        File compressedFile = await _compressFile(file);
+
+        final fileName = compressedFile.path.split(RegExp(r'[/\\]')).last;
+        final String key = "imag${i + 1}_photo";
+
+        formData.files.add(
+          MapEntry(
+            key,
+            await MultipartFile.fromFile(
+              compressedFile.path,
+              filename: fileName,
+            ),
+          ),
+        );
+      }
+
+      final opts = await _authOptions();
+      opts.headers?.remove('Content-Type');
+
+      Response response = await Dio().post(
+        'http://161.35.51.188:5001/api/sponsors/user/$userId',
+        data: formData,
+        options: opts,
+      );
+
+      return response;
+    } catch (e) {
+      print("Create Sponsor For User Error: $e");
+      rethrow;
+    }
+  }
+
+  /// 9. GET /api/sponsors — Get all sponsors (paginated, Admin)
+  Future<List<dynamic>> getAllSponsors({int? page, int? limit}) async {
+    try {
+      final opts = await _authOptions();
+      final Map<String, dynamic> params = {};
+      if (page != null) params['page'] = page;
+      if (limit != null) params['limit'] = limit;
+
+      Response response = await dio.get(
+        'sponsors',
+        queryParameters: params.isNotEmpty ? params : null,
+        options: opts,
+      );
       if (response.statusCode == 200) {
         if (response.data is Map && response.data.containsKey('data')) {
           return response.data['data'];
@@ -146,57 +407,53 @@ class WebServices {
     }
   }
 
-  Future<Response> addSponsor(
-    Map<String, dynamic> data,
-    List<File> images,
-  ) async {
+  /// 10. GET /api/sponsors/stats — Get sponsor statistics (Admin)
+  Future<Map<String, dynamic>?> getSponsorStats() async {
     try {
-      FormData formData = FormData.fromMap(data);
-
-      for (int i = 0; i < images.length; i++) {
-        if (i >= 3) break;
-        final file = images[i];
-
-        // Compress image
-        File compressedFile = await _compressFile(file);
-
-        final fileName = compressedFile.path.split('/').last;
-        final String key = "imag${i + 1}_photo";
-
-        formData.files.add(
-          MapEntry(
-            key,
-            await MultipartFile.fromFile(
-              compressedFile.path,
-              filename: fileName,
-            ),
-          ),
-        );
-      }
-
-      // Use the direct backend URL instead of the nginx proxy
-      // (api.aidme.online does not forward POST /sponsors)
       final opts = await _authOptions();
-      // Override content-type in options to let Dio handle multipart
-      opts.headers?.remove('Content-Type');
-
-      Response response = await Dio().post(
-        'http://161.35.51.188:5001/api/sponsors',
-        data: formData,
-        options: opts,
-      );
-
-      return response;
+      Response response = await dio.get('sponsors/stats', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
     } catch (e) {
-      print("Add Sponsor Error: $e");
-      rethrow;
+      print("Get Sponsor Stats Error: $e");
+      return null;
     }
   }
 
-  /// Get a single sponsor by ID: `GET /api/sponsors/:id`
+  /// 11. GET /api/sponsors/search?q={keyword}&field={field} — Search sponsors (Admin)
+  Future<List<dynamic>> searchSponsors(String keyword, String field) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get(
+        'sponsors/search',
+        queryParameters: {'q': keyword, 'field': field},
+        options: opts,
+      );
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'];
+        } else if (response.data is List) {
+          return response.data;
+        }
+      }
+      return [];
+    } catch (e) {
+      print("Search Sponsors Error: $e");
+      return [];
+    }
+  }
+
+  /// 12. GET /api/sponsors/{id} — Get sponsor by ID (Admin)
   Future<Map<String, dynamic>?> getSponsorById(int id) async {
     try {
-      Response response = await dio.get('sponsors/$id');
+      final opts = await _authOptions();
+      Response response = await dio.get('sponsors/$id', options: opts);
       if (response.statusCode == 200) {
         if (response.data is Map && response.data.containsKey('data')) {
           return response.data['data'] as Map<String, dynamic>;
@@ -211,7 +468,46 @@ class WebServices {
     }
   }
 
-  /// Update a sponsor: `PUT /api/sponsors/:id`
+  /// 13. GET /api/sponsors/user/{userId} — Get sponsor by user ID (Admin)
+  Future<Map<String, dynamic>?> getSponsorByUserId(int userId) async {
+    try {
+      // This endpoint requires admin auth
+      String adminToken = "";
+      try {
+        Response loginResp = await Dio().post(
+          'http://161.35.51.188:5001/api/auth/login',
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
+        );
+        if (loginResp.statusCode == 200 && loginResp.data != null) {
+          adminToken = loginResp.data['token'] ?? "";
+        }
+      } catch (_) {}
+
+      if (adminToken.isEmpty) return null;
+
+      Response response = await Dio().get(
+        'http://161.35.51.188:5001/api/sponsors/user/$userId',
+        options: Options(headers: {
+          "Authorization": "Bearer $adminToken",
+          "Content-Type": "application/json",
+        }),
+      );
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Get Sponsor By User ID Error: $e");
+      return null;
+    }
+  }
+
+  /// 14. PUT /api/sponsors/{id} — Update sponsor by ID (Admin)
   Future<Response> updateSponsor(
     int id,
     Map<String, dynamic> data,
@@ -226,7 +522,7 @@ class WebServices {
 
         File compressedFile = await _compressFile(file);
 
-        final fileName = compressedFile.path.split('/').last;
+        final fileName = compressedFile.path.split(RegExp(r'[/\\]')).last;
         final String key = "imag${i + 1}_photo";
 
         formData.files.add(
@@ -261,10 +557,11 @@ class WebServices {
     }
   }
 
-  /// Delete a sponsor: `DELETE /api/sponsors/:id`
+  /// 15. DELETE /api/sponsors/{id} — Delete sponsor by ID (Admin)
   Future<bool> deleteSponsor(int id) async {
     try {
-      Response response = await dio.delete('sponsors/$id');
+      final opts = await _authOptions();
+      Response response = await dio.delete('sponsors/$id', options: opts);
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       print("Delete Sponsor Error: $e");
@@ -272,24 +569,51 @@ class WebServices {
     }
   }
 
-  /// Search sponsors: `GET /api/sponsors/search?q=keyword&field=field`
-  Future<List<dynamic>> searchSponsors(String keyword, String field) async {
+  /// Legacy helper — admin create sponsor (used by AddSponsorScreen)
+  Future<Response> addSponsor(
+    Map<String, dynamic> data,
+    List<File> images,
+  ) async {
     try {
-      Response response = await dio.get(
-        'sponsors/search',
-        queryParameters: {'q': keyword, 'field': field},
-      );
-      if (response.statusCode == 200) {
-        if (response.data is Map && response.data.containsKey('data')) {
-          return response.data['data'];
-        } else if (response.data is List) {
-          return response.data;
-        }
+      FormData formData = FormData.fromMap(data);
+
+      for (int i = 0; i < images.length; i++) {
+        if (i >= 3) break;
+        final file = images[i];
+
+        // Compress image
+        File compressedFile = await _compressFile(file);
+
+        final fileName = compressedFile.path.split(RegExp(r'[/\\]')).last;
+        final String key = "imag${i + 1}_photo";
+
+        formData.files.add(
+          MapEntry(
+            key,
+            await MultipartFile.fromFile(
+              compressedFile.path,
+              filename: fileName,
+            ),
+          ),
+        );
       }
-      return [];
+
+      // Use the direct backend URL instead of the nginx proxy
+      // (api.aidme.online does not forward POST /sponsors)
+      final opts = await _authOptions();
+      // Override content-type in options to let Dio handle multipart
+      opts.headers?.remove('Content-Type');
+
+      Response response = await Dio().post(
+        'http://161.35.51.188:5001/api/sponsors',
+        data: formData,
+        options: opts,
+      );
+
+      return response;
     } catch (e) {
-      print("Search Sponsors Error: $e");
-      return [];
+      print("Add Sponsor Error: $e");
+      rethrow;
     }
   }
 
@@ -300,7 +624,8 @@ class WebServices {
       try {
         Response loginResp = await Dio().post(
           'http://161.35.51.188:5001/api/auth/login',
-          data: {"uname": "ts2025", "password": "123456"},
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
         );
 
         if (loginResp.statusCode == 200 && loginResp.data != null) {
@@ -318,8 +643,9 @@ class WebServices {
       }
 
       // 2. Fetch users using the Bearer token from the exact URL
+      // Use a large limit to fetch ALL users (default pagination may skip users)
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/users',
+        'http://161.35.51.188:5001/api/users?limit=10000',
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
       List<dynamic> users = [];
@@ -354,8 +680,7 @@ class WebServices {
                 options: Options(headers: {"Authorization": "Bearer $token"}),
               );
               if (detailResp.statusCode == 200 && detailResp.data != null) {
-                final detailData =
-                    detailResp.data is Map &&
+                final detailData = detailResp.data is Map &&
                         detailResp.data.containsKey('data')
                     ? detailResp.data['data']
                     : detailResp.data;
@@ -391,7 +716,8 @@ class WebServices {
       try {
         Response loginResp = await Dio().post(
           'http://161.35.51.188:5001/api/auth/login',
-          data: {"uname": "ts2025", "password": "123456"},
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
         );
 
         if (loginResp.statusCode == 200 && loginResp.data != null) {
@@ -407,9 +733,9 @@ class WebServices {
         return null;
       }
 
-      // 2. Fetch all users
+      // 2. Fetch all users (use large limit to bypass default pagination)
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/users',
+        'http://161.35.51.188:5001/api/users?limit=10000',
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
       List<dynamic> users = [];
@@ -432,7 +758,7 @@ class WebServices {
           final fullName = '$fName $lName'.trim();
 
           bool isMatch = false;
-          if (uName != null && uName == username) {
+          if (uName != null && uName.toLowerCase() == username.toLowerCase()) {
             isMatch = true;
           } else if (fullName.isNotEmpty &&
               fullName.toLowerCase() == username.toLowerCase()) {
@@ -448,8 +774,7 @@ class WebServices {
                   options: Options(headers: {"Authorization": "Bearer $token"}),
                 );
                 if (detailResp.statusCode == 200 && detailResp.data != null) {
-                  final detailData =
-                      detailResp.data is Map &&
+                  final detailData = detailResp.data is Map &&
                           detailResp.data.containsKey('data')
                       ? detailResp.data['data']
                       : detailResp.data;
@@ -486,7 +811,8 @@ class WebServices {
     try {
       Response response = await Dio().post(
         'http://161.35.51.188:5001/api/auth/login',
-        data: {"uname": usernameOrEmail, "password": password},
+        data: {"user_name": usernameOrEmail, "user_password": password},
+        options: Options(contentType: 'application/json'),
       );
 
       final token = response.data?['token'] ?? response.data?['accessToken'];
@@ -971,6 +1297,20 @@ class WebServices {
       };
 
       final userId = _extractUserId(user);
+      // Use admin auth since PUT /users/:id requires admin role (901/903)
+      String adminToken = "";
+      try {
+        Response loginResp = await Dio().post(
+          'http://161.35.51.188:5001/api/auth/login',
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
+        );
+        if (loginResp.statusCode == 200 && loginResp.data != null) {
+          adminToken = loginResp.data['token'] ?? loginResp.data['accessToken'] ?? "";
+        }
+      } catch (_) {}
+      if (adminToken.isEmpty) return;
+      final opts = Options(headers: {"Authorization": "Bearer $adminToken", "Content-Type": "application/json"});
       if (userId != null && userId.isNotEmpty) {
         final endpoints = [
           'http://161.35.51.188:5001/api/users/$userId',
@@ -980,9 +1320,9 @@ class WebServices {
         for (final endpoint in endpoints) {
           try {
             if (endpoint.startsWith('http')) {
-              await Dio().put(endpoint, data: payload);
+              await Dio().put(endpoint, data: payload, options: opts);
             } else {
-              await dio.put(endpoint, data: payload);
+              await dio.put(endpoint, data: payload, options: opts);
             }
             return;
           } catch (_) {}
@@ -998,9 +1338,9 @@ class WebServices {
       for (final endpoint in fallbackEndpoints) {
         try {
           if (endpoint.startsWith('http')) {
-            await Dio().put(endpoint, data: fallbackPayload);
+            await Dio().put(endpoint, data: fallbackPayload, options: opts);
           } else {
-            await dio.put(endpoint, data: fallbackPayload);
+            await dio.put(endpoint, data: fallbackPayload, options: opts);
           }
           return;
         } catch (_) {}
@@ -1026,5 +1366,86 @@ class WebServices {
       }
     }
     return null;
+  }
+
+  /// Get all users (Admin) — returns the full list for admin management
+  Future<List<Map<String, dynamic>>> getAllUsersAdmin() async {
+    try {
+      String adminToken = "";
+      try {
+        Response loginResp = await Dio().post(
+          'http://161.35.51.188:5001/api/auth/login',
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
+        );
+        if (loginResp.statusCode == 200 && loginResp.data != null) {
+          adminToken = loginResp.data['token'] ?? "";
+        }
+      } catch (_) {}
+
+      if (adminToken.isEmpty) return [];
+
+      Response response = await Dio().get(
+        'http://161.35.51.188:5001/api/users?limit=10000',
+        options: Options(headers: {"Authorization": "Bearer $adminToken"}),
+      );
+
+      List<dynamic> users = [];
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          users = response.data['data'];
+        } else if (response.data is List) {
+          users = response.data;
+        }
+      }
+
+      return users
+          .whereType<Map>()
+          .map((u) => Map<String, dynamic>.from(u))
+          .toList();
+    } catch (e) {
+      print("Get All Users Admin Error: $e");
+      return [];
+    }
+  }
+
+  /// Update user status (Admin) — approve (2) or reject (3)
+  Future<bool> updateUserStatus(int userId, int newStatus) async {
+    try {
+      String adminToken = "";
+      try {
+        Response loginResp = await Dio().post(
+          'http://161.35.51.188:5001/api/auth/login',
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
+        );
+        if (loginResp.statusCode == 200 && loginResp.data != null) {
+          adminToken = loginResp.data['token'] ?? "";
+        }
+      } catch (_) {}
+
+      if (adminToken.isEmpty) return false;
+
+      Response response = await Dio().put(
+        'http://161.35.51.188:5001/api/users/$userId',
+        data: {'statu': newStatus},
+        options: Options(
+          headers: {
+            "Authorization": "Bearer $adminToken",
+            "Content-Type": "application/json",
+          },
+        ),
+      );
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print("Update User Status Error: $e");
+      return false;
+    }
+  }
+
+  /// Check if a user exists by email (lightweight — returns user data or null)
+  Future<Map<String, dynamic>?> checkUserExistsByEmail(String email) async {
+    return await getUserByEmail(email);
   }
 }

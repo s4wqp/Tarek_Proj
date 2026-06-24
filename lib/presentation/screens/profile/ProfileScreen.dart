@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:tarek_proj/config/app_colors.dart';
 import 'package:tarek_proj/data/web_services/web_services.dart';
 import 'package:tarek_proj/presentation/screens/auth/Login.dart';
+import 'package:tarek_proj/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -50,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
-      print("Backend fetch error: $e");
+      debugPrint("Backend fetch error: $e");
     }
 
     if (mounted) setState(() => _isLoading = false);
@@ -135,7 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (e) {
-      print("Logout error: $e");
+      debugPrint("Logout error: $e");
     }
   }
 
@@ -233,6 +235,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   'u_type_id', 'serviceType',
                                   fallback: '—'))),
                           _buildStatusRow(),
+                        ]),
+                        const SizedBox(height: 20),
+                        // ── Settings Section ──
+                        _buildSectionTitle('Settings'),
+                        _buildInfoCard([
+                          _buildThemeToggleRow(),
+                          _buildActionRow(
+                            Icons.language,
+                            'Language',
+                            'English',
+                            () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Multi-language support coming soon!')),
+                              );
+                            },
+                          ),
+                          _buildActionRow(
+                            Icons.info_outline,
+                            'About',
+                            'v1.0.0',
+                            () {
+                              showAboutDialog(
+                                context: context,
+                                applicationName: 'Services App',
+                                applicationVersion: '1.0.0',
+                                applicationLegalese: '© 2026',
+                              );
+                            },
+                          ),
                         ]),
                         const SizedBox(height: 30),
                         // ── Logout Button ──
@@ -444,6 +477,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── THEME TOGGLE ROW ──────────────────────────────────
+  Widget _buildThemeToggleRow() {
+    final themeProvider = ThemeProviderScope.maybeOf(context);
+    final isDark = themeProvider?.isDark ?? true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(
+            isDark ? Icons.dark_mode : Icons.light_mode,
+            color: _accentColor,
+            size: 22,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Appearance',
+                    style: TextStyle(color: Colors.white38, fontSize: 11)),
+                const SizedBox(height: 3),
+                Text(
+                  isDark ? 'Dark Mode' : 'Light Mode',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: isDark,
+            activeTrackColor: AppColors.primary,
+            onChanged: (value) {
+              themeProvider?.setDark(value);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── ACTION ROW ────────────────────────────────────────
+  Widget _buildActionRow(
+      IconData icon, String label, String value, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: _accentColor, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 11)),
+                  const SizedBox(height: 3),
+                  Text(value,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
+          ],
+        ),
       ),
     );
   }

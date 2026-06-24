@@ -238,6 +238,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 40),
                   TextField(
                     controller: emailController,
+                    style: const TextStyle(color: Colors.black),
                     keyboardType: TextInputType.emailAddress,
                     onChanged: (value) {
                       if (_emailErrorText != null) {
@@ -249,6 +250,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.email, color: Colors.indigo),
                       hintText: 'name@gmail.com',
+                      hintStyle: const TextStyle(color: Colors.black54),
                       errorText: _emailErrorText,
                       errorStyle: const TextStyle(
                           color: Colors.redAccent,
@@ -263,6 +265,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 20),
                   TextField(
                     controller: usernameController,
+                    style: const TextStyle(color: Colors.black),
                     onChanged: (value) {
                       if (_usernameErrorText != null) {
                         setState(() {
@@ -274,6 +277,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       prefixIcon:
                           const Icon(Icons.person, color: Colors.indigo),
                       hintText: 'Username',
+                      hintStyle: const TextStyle(color: Colors.black54),
                       errorText: _usernameErrorText,
                       errorStyle: const TextStyle(
                           color: Colors.redAccent,
@@ -288,11 +292,13 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 20),
                   TextField(
                     controller: passController,
+                    style: const TextStyle(color: Colors.black),
                     obscureText: _obscureTextPass,
                     maxLength: 16,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock, color: Colors.indigo),
                       hintText: 'Password',
+                      hintStyle: const TextStyle(color: Colors.black54),
                       counterText: "",
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(15)),
@@ -313,11 +319,13 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 20),
                   TextField(
                     controller: repassController,
+                    style: const TextStyle(color: Colors.black),
                     obscureText: _obscureTextRePass,
                     maxLength: 16,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock, color: Colors.indigo),
                       hintText: 'Confirm Password',
+                      hintStyle: const TextStyle(color: Colors.black54),
                       counterText: "",
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(15)),

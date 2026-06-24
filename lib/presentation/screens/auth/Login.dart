@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'SignUp.dart';
 import 'approval_waiting.dart';
+import 'package:tarek_proj/presentation/screens/auth/sponsor_register_screen.dart';
 import 'package:tarek_proj/presentation/screens/home/Choice.dart';
 import 'package:tarek_proj/presentation/screens/home/HomePage.dart';
 import 'package:tarek_proj/presentation/screens/home/ServicesHomeScreen.dart';
@@ -193,7 +194,8 @@ class _LoginPageState extends State<LoginPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_token', token);
       await prefs.setString('user_email', emailToLoginWith);
-      await WebServices().backfillUserLocationIfMissing(
+      // Fire-and-forget: don't await this, it's a background optimization
+      WebServices().backfillUserLocationIfMissing(
         email: emailToLoginWith,
         country: (prefs.getString('user_country') ?? ''),
         city: (prefs.getString('user_city') ?? ''),
@@ -393,6 +395,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         TextField(
                           controller: emailController,
+                          style: const TextStyle(color: Colors.black),
                           keyboardType: TextInputType.emailAddress,
                           autofillHints: const [
                             AutofillHints.email,
@@ -427,6 +430,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         TextField(
                           controller: passwordController,
+                          style: const TextStyle(color: Colors.black),
                           obscureText: _isObscured,
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
@@ -506,6 +510,40 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const SponsorRegisterScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.business,
+                                color: Colors.amber, size: 20),
+                            label: const Text(
+                              'Register as Sponsor',
+                              style: TextStyle(
+                                color: Colors.amber,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                  color: Colors.amber, width: 1.5),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),

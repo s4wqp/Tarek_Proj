@@ -164,6 +164,7 @@ class _PersonalInfo2State extends State<PersonalInfo2> {
                   ),
                   TextField(
                     controller: firstNameController,
+                    style: const TextStyle(color: Colors.black),
                     decoration: InputDecoration(
                       prefixIcon:
                           const Icon(Icons.person, color: Colors.indigo),
@@ -195,6 +196,7 @@ class _PersonalInfo2State extends State<PersonalInfo2> {
                   ),
                   TextField(
                     controller: lastNameController,
+                    style: const TextStyle(color: Colors.black),
                     decoration: InputDecoration(
                       prefixIcon:
                           const Icon(Icons.person, color: Colors.indigo),
@@ -226,6 +228,7 @@ class _PersonalInfo2State extends State<PersonalInfo2> {
                   ),
                   TextField(
                     controller: arabicNameController,
+                    style: const TextStyle(color: Colors.black),
                     textDirection: TextDirection.rtl,
                     textAlign: TextAlign.right,
                     decoration: InputDecoration(
@@ -266,7 +269,11 @@ class _PersonalInfo2State extends State<PersonalInfo2> {
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
-                        hint: const Text("Select your job"),
+                        dropdownColor: Colors.white,
+                        style:
+                            const TextStyle(color: Colors.black, fontSize: 16),
+                        hint: const Text("Select your job",
+                            style: TextStyle(color: Colors.black)),
                         value: selectedJob,
                         icon: const Icon(Icons.work, color: Colors.indigo),
                         items: jobs.map((String job) {
