@@ -191,8 +191,8 @@ class _Searchservice2State extends State<Searchservice2> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const SearchServices3(
-          addressDetails: {},
+        builder: (context) => SearchServices3(
+          addressDetails: addressDetails,
         ),
       ),
     );

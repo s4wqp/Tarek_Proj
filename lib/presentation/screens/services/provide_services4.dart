@@ -184,6 +184,7 @@ class _ProvideServices4State extends State<ProvideServices4> {
     return foundID; // Return best non-14-digit candidate if any
   }
 
+  // ignore: unused_element
   Future<void> _scanText(File imageFile,
       {bool isFront = true, bool showResultDialog = true}) async {
     String? foundID;

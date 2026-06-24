@@ -49,7 +49,6 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
 
   List<Map<String, dynamic>> _categoriesData = [];
   List<String> _categories = [];
-  bool _isLoadingCategories = true;
   String? _selectedCategory;
 
   void _fillRandomData() {
@@ -110,7 +109,6 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
               .map((c) => c['sponsor_type']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toList();
-          _isLoadingCategories = false;
         });
       } else {
         _setFallbackCategories();
@@ -138,7 +136,6 @@ class _AddSponsorScreenState extends State<AddSponsorScreen> {
           .map((c) => c['sponsor_type']?.toString() ?? '')
           .where((s) => s.isNotEmpty)
           .toList();
-      _isLoadingCategories = false;
     });
   }
 

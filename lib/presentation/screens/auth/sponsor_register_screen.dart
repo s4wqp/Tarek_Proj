@@ -6,7 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:dio/dio.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-import 'package:url_launcher/url_launcher.dart';
+
 import 'package:tarek_proj/data/web_services/web_services.dart';
 import 'package:tarek_proj/config/app_colors.dart';
 
@@ -300,27 +300,6 @@ class _SponsorRegisterScreenState extends State<SponsorRegisterScreen> {
     });
   }
 
-  /// Send confirmation email to sponsor after registration
-  Future<void> _sendRegistrationEmail(String email, String businessName) async {
-    try {
-      final emailUri = Uri(
-        scheme: 'mailto',
-        path: email,
-        queryParameters: {
-          'subject': 'Registration Received \u2014 AidMe',
-          'body': 'Dear $businessName Team,\n\n'
-              'Thank you for registering as a sponsor on AidMe!\n\n'
-              'Your application has been submitted successfully and is now under review by our admin team.\n\n'
-              'You will receive a confirmation once your account is approved.\n\n'
-              'Best regards,\nAidMe Team',
-        },
-      );
-      await launchUrl(emailUri);
-    } catch (e) {
-      print('Failed to send registration email: $e');
-    }
-  }
-
   Future<void> _getLocation() async {
     setState(() => _isLocating = true);
     try {
@@ -502,9 +481,6 @@ class _SponsorRegisterScreenState extends State<SponsorRegisterScreen> {
       if (!mounted) return;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Send confirmation email to sponsor
-        // Email notification disabled for now
-        // _sendRegistrationEmail(email, _businessName.text.trim());
 
         AwesomeDialog(
           context: context,

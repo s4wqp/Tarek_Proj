@@ -17,9 +17,9 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
-  String _totalUsers = '—';
-  String _activeProviders = '—';
-  String _pendingApprovals = '—';
+  String _totalTrips = '—';
+  String _activeTrips = '—';
+  String _pendingTrips = '—';
   String _totalSponsors = '—';
   String? _error;
 
@@ -54,11 +54,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() {
           _totalSponsors = sponsors != null ? '${sponsors.length}' : '—';
           if (tripStats != null) {
-            _totalUsers =
+            _totalTrips =
                 '${tripStats['total_trips'] ?? tripStats['totalTrips'] ?? '—'}';
-            _activeProviders =
+            _activeTrips =
                 '${tripStats['active_trips'] ?? tripStats['activeTrips'] ?? '—'}';
-            _pendingApprovals =
+            _pendingTrips =
                 '${tripStats['pending_trips'] ?? tripStats['pendingTrips'] ?? '—'}';
           }
           _isLoading = false;
@@ -138,19 +138,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           children: [
                             StatCard(
                               title: 'Total Trips',
-                              value: _totalUsers,
+                              value: _totalTrips,
                               icon: Icons.route,
                               color: AppColors.primary,
                             ),
                             StatCard(
                               title: 'Active Trips',
-                              value: _activeProviders,
+                              value: _activeTrips,
                               icon: Icons.directions_car,
                               color: AppColors.secondary,
                             ),
                             StatCard(
                               title: 'Pending Trips',
-                              value: _pendingApprovals,
+                              value: _pendingTrips,
                               icon: Icons.pending_actions,
                               color: AppColors.error,
                             ),

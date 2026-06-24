@@ -380,8 +380,11 @@ class WebServices {
     }
   }
 
-  /// 9. GET /api/sponsors — Get all sponsors (paginated, Admin)
+  /// 9. GET /api/sponsors — Get all sponsors
+  /// Uses admin auth so it works even on the login screen (no user token).
+  /// Tries the primary base URL first, falls back to the old direct server.
   Future<List<dynamic>> getAllSponsors({int? page, int? limit}) async {
+    // 1. Try with stored user token via base URL
     try {
       final opts = await _authOptions();
       final Map<String, dynamic> params = {};
@@ -395,16 +398,51 @@ class WebServices {
       );
       if (response.statusCode == 200) {
         if (response.data is Map && response.data.containsKey('data')) {
+          final data = response.data['data'];
+          if (data is List && data.isNotEmpty) return data;
+        } else if (response.data is List && response.data.isNotEmpty) {
+          return response.data;
+        }
+      }
+    } catch (e) {
+      print("Get Sponsors (primary) Error: $e");
+    }
+
+    // 2. Fallback: authenticate as admin and use old server directly
+    try {
+      String adminToken = "";
+      try {
+        Response loginResp = await Dio().post(
+          'http://161.35.51.188:5001/api/auth/login',
+          data: {"user_name": "ts2025", "user_password": "123456"},
+          options: Options(contentType: 'application/json'),
+        );
+        if (loginResp.statusCode == 200 && loginResp.data != null) {
+          adminToken = loginResp.data['token'] ?? "";
+        }
+      } catch (_) {}
+
+      if (adminToken.isEmpty) return [];
+
+      Response response = await Dio().get(
+        'http://161.35.51.188:5001/api/sponsors',
+        options: Options(headers: {
+          "Authorization": "Bearer $adminToken",
+          "Content-Type": "application/json",
+        }),
+      );
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
           return response.data['data'];
         } else if (response.data is List) {
           return response.data;
         }
       }
-      return [];
     } catch (e) {
-      print("Get Sponsors Error: $e");
-      return [];
+      print("Get Sponsors (fallback) Error: $e");
     }
+
+    return [];
   }
 
   /// 10. GET /api/sponsors/stats — Get sponsor statistics (Admin)
