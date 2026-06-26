@@ -49,64 +49,81 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _fetchSponsors() async {
     try {
+      // 1. Try new public endpoint (no auth needed — perfect for login screen)
+      final photos = await WebServices().getSponsorPhotosRandom(limit: 20);
+      if (photos.isNotEmpty && mounted) {
+        final List<Map<String, dynamic>> mappedSponsors = [];
+
+        for (var photo in photos) {
+          if (photo is Map) {
+            String imagePath = photo['image']?.toString() ?? '';
+            if (imagePath.isEmpty) continue;
+
+            // Build full URL from relative path (e.g. /uploads/sponsors/21/img.jpg)
+            String imageUrl = imagePath;
+            if (!imageUrl.startsWith('http')) {
+              if (imageUrl.startsWith('/')) {
+                imageUrl = imageUrl.substring(1);
+              }
+              imageUrl = "https://api.aidme.online/$imageUrl";
+            }
+
+            mappedSponsors.add({
+              "image": imageUrl,
+              "business_name": photo['business_name'] ?? '',
+              "category": photo['category'] ?? '',
+              "url": '', // No website URL in this endpoint
+            });
+          }
+        }
+
+        if (mappedSponsors.isNotEmpty && mounted) {
+          setState(() {
+            sponsors = mappedSponsors;
+            currentIndex = 0;
+          });
+          return; // Success — no need for fallback
+        }
+      }
+
+      // 2. Fallback: try old getAllSponsors() method
       final fetchedSponsors = await WebServices().getAllSponsors();
-      if (fetchedSponsors.isNotEmpty) {
-        if (mounted) {
-          // Filter to ensure elements are Maps and allow dynamic keys
-          final validSponsors = fetchedSponsors.whereType<Map>().toList();
+      if (fetchedSponsors.isNotEmpty && mounted) {
+        final validSponsors = fetchedSponsors.whereType<Map>().toList();
+        if (validSponsors.isNotEmpty) {
+          final List<Map<String, dynamic>> mappedSponsors = [];
 
-          if (validSponsors.isNotEmpty) {
-            final List<Map<String, dynamic>> mappedSponsors = [];
+          for (var data in validSponsors) {
+            final String webSiteUrl = data['sponsor_web_site'] ?? '';
+            final Set<String> uniqueUrls = {};
 
-            for (var data in validSponsors) {
-              final mapData = data;
-              final String webSiteUrl = mapData['sponsor_web_site'] ?? '';
-              final Set<String> uniqueUrls = {};
-
-              // Check for multiple image keys and collect unique URLs
-              List<String> potentialKeys = [
-                'imag1_photo',
-                'imag2_photo',
-                'imag3_photo',
-                'image' // Legacy fallback
-              ];
-
-              for (String key in potentialKeys) {
-                final val = mapData[key];
-                if (val != null && val is String && val.isNotEmpty) {
-                  uniqueUrls.add(val);
-                }
-              }
-
-              for (String rawUrl in uniqueUrls) {
-                String imageUrl = rawUrl;
-                if (!imageUrl.startsWith('http')) {
-                  // Normalize path to prevent double slashes
-                  if (imageUrl.startsWith('/')) {
-                    imageUrl = imageUrl.substring(1);
-                  }
-                  // Fix backend discrepancy: new images miss "public/" prefix
-                  if (!imageUrl.startsWith('public/')) {
-                    imageUrl = "public/$imageUrl";
-                  }
-
-                  // Prepend base URL with HTTPS wrapper
-                  imageUrl = "https://api.aidme.online/$imageUrl";
-                }
-
-                mappedSponsors.add({
-                  "image": imageUrl,
-                  "url": webSiteUrl,
-                });
+            for (String key in ['imag1_photo', 'imag2_photo', 'imag3_photo', 'image']) {
+              final val = data[key];
+              if (val != null && val is String && val.isNotEmpty) {
+                uniqueUrls.add(val);
               }
             }
 
-            if (mounted) {
-              setState(() {
-                sponsors = mappedSponsors;
-                currentIndex = 0;
-              });
+            for (String rawUrl in uniqueUrls) {
+              String imageUrl = rawUrl;
+              if (!imageUrl.startsWith('http')) {
+                if (imageUrl.startsWith('/')) {
+                  imageUrl = imageUrl.substring(1);
+                }
+                if (!imageUrl.startsWith('public/')) {
+                  imageUrl = "public/$imageUrl";
+                }
+                imageUrl = "https://api.aidme.online/$imageUrl";
+              }
+              mappedSponsors.add({"image": imageUrl, "url": webSiteUrl});
             }
+          }
+
+          if (mounted) {
+            setState(() {
+              sponsors = mappedSponsors;
+              currentIndex = 0;
+            });
           }
         }
       }

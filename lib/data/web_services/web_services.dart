@@ -445,6 +445,78 @@ class WebServices {
     return [];
   }
 
+  // ─── NEW Public Sponsor Photo Endpoints ───────────────────────
+
+  /// GET /api/sponsors/photos/random — Get random sponsor photos (PUBLIC, no auth)
+  /// Returns a list of approved sponsor photos, randomly ordered.
+  /// Each item: { id, user_id, business_name, category, image, image_index, total_images }
+  Future<List<dynamic>> getSponsorPhotosRandom({int limit = 20}) async {
+    try {
+      Response response = await dio.get(
+        'sponsors/photos/random',
+        queryParameters: {'limit': limit},
+      );
+      if (response.statusCode == 200 &&
+          response.data is Map &&
+          response.data.containsKey('data')) {
+        return response.data['data'];
+      }
+      return [];
+    } catch (e) {
+      print("Get Sponsor Photos Random Error: $e");
+      return [];
+    }
+  }
+
+  /// GET /api/sponsors/photos — Get all approved sponsor photos (requires auth)
+  Future<List<dynamic>> getSponsorPhotos() async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('sponsors/photos', options: opts);
+      if (response.statusCode == 200 &&
+          response.data is Map &&
+          response.data.containsKey('data')) {
+        return response.data['data'];
+      }
+      return [];
+    } catch (e) {
+      print("Get Sponsor Photos Error: $e");
+      return [];
+    }
+  }
+
+  /// GET /api/sponsors/photos/category/:categoryId — Get photos by category
+  Future<List<dynamic>> getSponsorPhotosByCategory(int categoryId) async {
+    try {
+      Response response = await dio.get('sponsors/photos/category/$categoryId');
+      if (response.statusCode == 200 &&
+          response.data is Map &&
+          response.data.containsKey('data')) {
+        return response.data['data'];
+      }
+      return [];
+    } catch (e) {
+      print("Get Sponsor Photos By Category Error: $e");
+      return [];
+    }
+  }
+
+  /// GET /api/sponsors/photos/featured — Get featured photos for hero section
+  Future<List<dynamic>> getSponsorPhotosFeatured() async {
+    try {
+      Response response = await dio.get('sponsors/photos/featured');
+      if (response.statusCode == 200 &&
+          response.data is Map &&
+          response.data.containsKey('data')) {
+        return response.data['data'];
+      }
+      return [];
+    } catch (e) {
+      print("Get Sponsor Photos Featured Error: $e");
+      return [];
+    }
+  }
+
   /// 10. GET /api/sponsors/stats — Get sponsor statistics (Admin)
   Future<Map<String, dynamic>?> getSponsorStats() async {
     try {
