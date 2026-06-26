@@ -55,7 +55,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       String adminToken = '';
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -79,7 +79,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       _adminToken = adminToken;
 
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/users?limit=10000',
+        'https://api.aidme.online/api/users?limit=10000',
         options: Options(headers: {'Authorization': 'Bearer $adminToken'}),
       );
 
@@ -143,7 +143,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Future<void> _updateUserStatus(int userId, int newStatus) async {
     try {
       await Dio().put(
-        'http://161.35.51.188:5001/api/users/$userId',
+        'https://api.aidme.online/api/users/$userId',
         data: {'statu': newStatus},
         options: Options(headers: {
           'Authorization': 'Bearer $_adminToken',

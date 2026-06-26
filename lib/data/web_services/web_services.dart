@@ -170,7 +170,7 @@ class WebServices {
 
       // Step 1: Register sponsor with JSON body (no images)
       Response response = await Dio().post(
-        'http://161.35.51.188:5001/api/sponsors/register',
+        'https://api.aidme.online/api/sponsors/register',
         data: data,
         options: Options(
           headers: {
@@ -209,7 +209,7 @@ class WebServices {
 
           print("DEBUG uploading sponsor image $key...");
           Response imgResp = await Dio().post(
-            'http://161.35.51.188:5001/api/sponsors/my-sponsor/image',
+            'https://api.aidme.online/api/sponsors/my-sponsor/image',
             data: imgForm,
             options: Options(
               headers: {'Authorization': 'Bearer $token'},
@@ -368,7 +368,7 @@ class WebServices {
       opts.headers?.remove('Content-Type');
 
       Response response = await Dio().post(
-        'http://161.35.51.188:5001/api/sponsors/user/$userId',
+        'https://api.aidme.online/api/sponsors/user/$userId',
         data: formData,
         options: opts,
       );
@@ -413,7 +413,7 @@ class WebServices {
       String adminToken = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -425,7 +425,7 @@ class WebServices {
       if (adminToken.isEmpty) return [];
 
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/sponsors',
+        'https://api.aidme.online/api/sponsors',
         options: Options(headers: {
           "Authorization": "Bearer $adminToken",
           "Content-Type": "application/json",
@@ -585,7 +585,7 @@ class WebServices {
       String adminToken = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -597,7 +597,7 @@ class WebServices {
       if (adminToken.isEmpty) return null;
 
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/sponsors/user/$userId',
+        'https://api.aidme.online/api/sponsors/user/$userId',
         options: Options(headers: {
           "Authorization": "Bearer $adminToken",
           "Content-Type": "application/json",
@@ -715,7 +715,7 @@ class WebServices {
       opts.headers?.remove('Content-Type');
 
       Response response = await Dio().post(
-        'http://161.35.51.188:5001/api/sponsors',
+        'https://api.aidme.online/api/sponsors',
         data: formData,
         options: opts,
       );
@@ -733,7 +733,7 @@ class WebServices {
       String token = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -755,7 +755,7 @@ class WebServices {
       // 2. Fetch users using the Bearer token from the exact URL
       // Use a large limit to fetch ALL users (default pagination may skip users)
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/users?limit=10000',
+        'https://api.aidme.online/api/users?limit=10000',
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
       List<dynamic> users = [];
@@ -786,7 +786,7 @@ class WebServices {
           if (userId != null) {
             try {
               Response detailResp = await Dio().get(
-                'http://161.35.51.188:5001/api/users/$userId',
+                'https://api.aidme.online/api/users/$userId',
                 options: Options(headers: {"Authorization": "Bearer $token"}),
               );
               if (detailResp.statusCode == 200 && detailResp.data != null) {
@@ -825,7 +825,7 @@ class WebServices {
       String token = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -845,7 +845,7 @@ class WebServices {
 
       // 2. Fetch all users (use large limit to bypass default pagination)
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/users?limit=10000',
+        'https://api.aidme.online/api/users?limit=10000',
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
       List<dynamic> users = [];
@@ -880,7 +880,7 @@ class WebServices {
             if (userId != null) {
               try {
                 Response detailResp = await Dio().get(
-                  'http://161.35.51.188:5001/api/users/$userId',
+                  'https://api.aidme.online/api/users/$userId',
                   options: Options(headers: {"Authorization": "Bearer $token"}),
                 );
                 if (detailResp.statusCode == 200 && detailResp.data != null) {
@@ -920,7 +920,7 @@ class WebServices {
   ) async {
     try {
       Response response = await Dio().post(
-        'http://161.35.51.188:5001/api/auth/login',
+        'https://api.aidme.online/api/auth/login',
         data: {"user_name": usernameOrEmail, "user_password": password},
         options: Options(contentType: 'application/json'),
       );
@@ -1411,7 +1411,7 @@ class WebServices {
       String adminToken = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -1423,7 +1423,7 @@ class WebServices {
       final opts = Options(headers: {"Authorization": "Bearer $adminToken", "Content-Type": "application/json"});
       if (userId != null && userId.isNotEmpty) {
         final endpoints = [
-          'http://161.35.51.188:5001/api/users/$userId',
+          'https://api.aidme.online/api/users/$userId',
           'users/$userId',
           'user/$userId',
         ];
@@ -1442,7 +1442,7 @@ class WebServices {
       // Fallback for backends that accept update-by-email.
       final fallbackPayload = <String, dynamic>{'email': email, ...payload};
       final fallbackEndpoints = [
-        'http://161.35.51.188:5001/api/users/update-by-email',
+        'https://api.aidme.online/api/users/update-by-email',
         'users/update-by-email',
       ];
       for (final endpoint in fallbackEndpoints) {
@@ -1484,7 +1484,7 @@ class WebServices {
       String adminToken = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -1496,7 +1496,7 @@ class WebServices {
       if (adminToken.isEmpty) return [];
 
       Response response = await Dio().get(
-        'http://161.35.51.188:5001/api/users?limit=10000',
+        'https://api.aidme.online/api/users?limit=10000',
         options: Options(headers: {"Authorization": "Bearer $adminToken"}),
       );
 
@@ -1525,7 +1525,7 @@ class WebServices {
       String adminToken = "";
       try {
         Response loginResp = await Dio().post(
-          'http://161.35.51.188:5001/api/auth/login',
+          'https://api.aidme.online/api/auth/login',
           data: {"user_name": "ts2025", "user_password": "123456"},
           options: Options(contentType: 'application/json'),
         );
@@ -1537,7 +1537,7 @@ class WebServices {
       if (adminToken.isEmpty) return false;
 
       Response response = await Dio().put(
-        'http://161.35.51.188:5001/api/users/$userId',
+        'https://api.aidme.online/api/users/$userId',
         data: {'statu': newStatus},
         options: Options(
           headers: {
