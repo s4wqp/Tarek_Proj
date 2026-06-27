@@ -209,7 +209,7 @@ class WebServices {
 
           print("DEBUG uploading sponsor image $key...");
           Response imgResp = await Dio().post(
-            'https://api.aidme.online/api/sponsors/my-sponsor/image',
+            'https://api.aidme.online/api/sponsors/upload-image',
             data: imgForm,
             options: Options(
               headers: {'Authorization': 'Bearer $token'},
@@ -233,12 +233,12 @@ class WebServices {
   //  Sponsor APIs (Approved Sponsors — cat_id: 801-809, statu: 2)
   // ------------------------------------
 
-  /// 2. GET /api/sponsors/my-sponsor — Get my sponsor data
-  /// Lightweight: tries /my-sponsor only, returns null on failure
+  /// 2. GET /api/sponsors/profile — Get my sponsor data
+  /// Lightweight: tries /profile only, returns null on failure
   Future<Map<String, dynamic>?> getMySponsorDirect() async {
     try {
       final opts = await _authOptions();
-      Response response = await dio.get('sponsors/my-sponsor', options: opts);
+      Response response = await dio.get('sponsors/profile', options: opts);
       if (response.statusCode == 200) {
         if (response.data is Map && response.data.containsKey('data')) {
           return response.data['data'] as Map<String, dynamic>;
@@ -275,25 +275,26 @@ class WebServices {
     return null;
   }
 
-  /// 3. PUT /api/sponsors/my-sponsor — Update my business info
+  /// 3. PUT /api/sponsors/profile — Update my business info
   Future<Response> updateMySponsor(Map<String, dynamic> data) async {
     try {
       final opts = await _authOptions();
-      return await dio.put('sponsors/my-sponsor', data: data, options: opts);
+      return await dio.put('sponsors/profile', data: data, options: opts);
     } catch (e) {
       print("Update My Sponsor Error: $e");
       rethrow;
     }
   }
 
-  /// 4. POST /api/sponsors/my-sponsor/add-image — Upload sponsor image
-  Future<Response> addMySponsorImage(File imageFile) async {
+  /// 4. POST /api/sponsors/upload-image — Upload sponsor image
+  /// Field name must be one of: imag1_photo, imag2_photo, imag3_photo
+  Future<Response> addMySponsorImage(File imageFile, {String fieldName = 'imag1_photo'}) async {
     try {
       File compressedFile = await _compressFile(imageFile);
 
       final fileName = compressedFile.path.split(RegExp(r'[/\\]')).last;
       FormData formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(
+        fieldName: await MultipartFile.fromFile(
           compressedFile.path,
           filename: fileName,
         ),
@@ -303,7 +304,7 @@ class WebServices {
       opts.headers?.remove('Content-Type');
 
       Response response = await dio.post(
-        'sponsors/my-sponsor/add-image',
+        'sponsors/upload-image',
         data: formData,
         options: opts,
       );
@@ -315,13 +316,13 @@ class WebServices {
     }
   }
 
-  /// 5-7. DELETE /api/sponsors/my-sponsor/image/{imageField} — Delete a specific image
+  /// 5-7. DELETE /api/sponsors/image/{imageField} — Delete a specific image
   /// [imageField] must be one of: 'imag1_photo', 'imag2_photo', 'imag3_photo'
   Future<bool> deleteMySponsorImage(String imageField) async {
     try {
       final opts = await _authOptions();
       Response response = await dio.delete(
-        'sponsors/my-sponsor/image/$imageField',
+        'sponsors/image/$imageField',
         options: opts,
       );
       return response.statusCode == 200 || response.statusCode == 204;
@@ -1557,5 +1558,271 @@ class WebServices {
   /// Check if a user exists by email (lightweight — returns user data or null)
   Future<Map<String, dynamic>?> checkUserExistsByEmail(String email) async {
     return await getUserByEmail(email);
+  }
+
+  // =============================================
+  //  NEW SPONSOR ENDPOINTS (June 2026)
+  // =============================================
+
+  /// GET /api/sponsors/user/current — Get current user's sponsor
+  Future<Map<String, dynamic>?> getCurrentUserSponsor() async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('sponsors/user/current', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Get Current User Sponsor Error: $e");
+      return null;
+    }
+  }
+
+  /// GET /api/sponsors/:userId — Get sponsor by user ID (new endpoint)
+  Future<Map<String, dynamic>?> getSponsorByUserIdNew(int userId) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('sponsors/$userId', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Get Sponsor By UserId (new) Error: $e");
+      return null;
+    }
+  }
+
+  /// PUT /api/sponsors/:userId/status — Update sponsor status (Admin)
+  Future<bool> updateSponsorStatus(int userId, int newStatus) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.put(
+        'sponsors/$userId/status',
+        data: {'statu': newStatus},
+        options: opts,
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print("Update Sponsor Status Error: $e");
+      return false;
+    }
+  }
+
+  /// GET /api/sponsors/check-status — Check profile completeness
+  Future<Map<String, dynamic>?> checkSponsorProfileStatus() async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('sponsors/check-status', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Check Sponsor Profile Status Error: $e");
+      return null;
+    }
+  }
+
+  /// POST /api/sponsors/cleanup-incomplete — Clean up incomplete registration
+  Future<bool> cleanupIncompleteSponsor() async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.post('sponsors/cleanup-incomplete', options: opts);
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Cleanup Incomplete Sponsor Error: $e");
+      return false;
+    }
+  }
+
+  // =============================================
+  //  WALLET & TRANSACTIONS APIs (June 2026)
+  // =============================================
+
+  /// GET /api/wallet/user/:userId — Get user wallet (points + money)
+  Future<Map<String, dynamic>?> getUserWallet(int userId) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('wallet/user/$userId', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          return response.data as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Get User Wallet Error: $e");
+      return null;
+    }
+  }
+
+  /// GET /api/wallet/points/user/:userId — Get points transactions
+  Future<List<dynamic>> getPointsTransactions(int userId) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('wallet/points/user/$userId', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] is List ? response.data['data'] : [];
+        } else if (response.data is List) {
+          return response.data;
+        }
+      }
+      return [];
+    } catch (e) {
+      print("Get Points Transactions Error: $e");
+      return [];
+    }
+  }
+
+  /// GET /api/wallet/money/user/:userId — Get money transactions
+  Future<List<dynamic>> getMoneyTransactions(int userId) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.get('wallet/money/user/$userId', options: opts);
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] is List ? response.data['data'] : [];
+        } else if (response.data is List) {
+          return response.data;
+        }
+      }
+      return [];
+    } catch (e) {
+      print("Get Money Transactions Error: $e");
+      return [];
+    }
+  }
+
+  /// GET /api/wallet/packages — Get points packages (Public)
+  Future<List<dynamic>> getPointsPackages() async {
+    try {
+      Response response = await dio.get('wallet/packages');
+      if (response.statusCode == 200) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] is List ? response.data['data'] : [];
+        } else if (response.data is List) {
+          return response.data;
+        }
+      }
+      return [];
+    } catch (e) {
+      print("Get Points Packages Error: $e");
+      return [];
+    }
+  }
+
+  /// POST /api/wallet/purchase-points — Purchase points
+  Future<Map<String, dynamic>?> purchasePoints(int packageId) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.post(
+        'wallet/purchase-points',
+        data: {'package_id': packageId},
+        options: opts,
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print("Purchase Points Error: $e");
+      return null;
+    }
+  }
+
+  /// POST /api/wallet/add-money — Add money (Admin)
+  Future<Map<String, dynamic>?> addMoney(int userId, double amount, {String? description}) async {
+    try {
+      final opts = await _authOptions();
+      final data = <String, dynamic>{
+        'user_id': userId,
+        'amount': amount,
+      };
+      if (description != null) data['description'] = description;
+      Response response = await dio.post('wallet/add-money', data: data, options: opts);
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print("Add Money Error: $e");
+      return null;
+    }
+  }
+
+  /// POST /api/wallet/add-points — Add points (Admin)
+  Future<Map<String, dynamic>?> addPoints(int userId, int points, {String? description}) async {
+    try {
+      final opts = await _authOptions();
+      final data = <String, dynamic>{
+        'user_id': userId,
+        'points': points,
+      };
+      if (description != null) data['description'] = description;
+      Response response = await dio.post('wallet/add-points', data: data, options: opts);
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print("Add Points Error: $e");
+      return null;
+    }
+  }
+
+  /// POST /api/wallet/withdraw-money — Withdraw money (Admin)
+  Future<Map<String, dynamic>?> withdrawMoney(int userId, double amount, {String? description}) async {
+    try {
+      final opts = await _authOptions();
+      final data = <String, dynamic>{
+        'user_id': userId,
+        'amount': amount,
+      };
+      if (description != null) data['description'] = description;
+      Response response = await dio.post('wallet/withdraw-money', data: data, options: opts);
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print("Withdraw Money Error: $e");
+      return null;
+    }
+  }
+
+  /// POST /api/wallet/convert-points — Convert points to money (Admin)
+  Future<Map<String, dynamic>?> convertPointsToMoney(int userId, int points) async {
+    try {
+      final opts = await _authOptions();
+      Response response = await dio.post(
+        'wallet/convert-points',
+        data: {'user_id': userId, 'points': points},
+        options: opts,
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print("Convert Points to Money Error: $e");
+      return null;
+    }
   }
 }

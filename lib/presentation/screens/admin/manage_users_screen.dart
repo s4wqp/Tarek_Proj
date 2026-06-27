@@ -195,6 +195,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       }
     }
 
+    // Also approve the sponsor profile so images appear on login screen
+    if (isSponsor) {
+      try {
+        await WebServices().updateSponsorStatus(parsedUserId, 2);
+        print('Sponsor status also updated for user $parsedUserId');
+      } catch (e) {
+        print('Sponsor status update error (non-fatal): $e');
+      }
+    }
+
     // Send email notification
     if (email != null && email.isNotEmpty) {
       try {
